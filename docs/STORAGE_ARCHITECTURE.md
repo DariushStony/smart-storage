@@ -100,7 +100,7 @@
 │  │ 2. Add to dirtyData (read-after-write)            │     │   │
 │  │ 3. Start debounce timer                            │     │   │
 │  │ 4. After 100ms → Save to storage                  │     │   │
-│  │ 5. Setup beforeunload listener (auto-flush)       │     │   │
+│  │ 5. Setup pagehide listener (auto-flush)           │     │   │
 │  │ 6. On error → Log to Sentry                       │     │   │
 │  └────────────────────────────────────────────────────┘     │   │
 │                               │                              │   │
@@ -177,7 +177,7 @@
 │  │ • Map<string, string> (in-memory)             │             │
 │  │ • No persistence                              │             │
 │  │ • Per-request isolation                       │             │
-│  │ • No beforeunload listeners                   │             │
+│  │ • No pagehide listeners                       │             │
 │  └────────────────────────────────────────────────┘             │
 │                                                                  │
 │  Client-Side (Browser):                                          │
@@ -188,7 +188,7 @@
 │  │ • localStorage / sessionStorage               │             │
 │  │ • Full persistence                            │             │
 │  │ • Shared across tabs (localStorage)           │             │
-│  │ • Auto-flush on beforeunload                  │             │
+│  │ • Auto-flush on pagehide                      │             │
 │  └────────────────────────────────────────────────┘             │
 │                                                                  │
 │  Hydration Pattern:                                              │

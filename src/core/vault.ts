@@ -139,7 +139,7 @@ class StorageVault {
     this.backend = new StorageBackend(storageType, logger);
     this.transformPipeline = new TransformPipeline(transforms, logger);
 
-    // Setup beforeunload handler to flush pending writes
+    // Setup pagehide handler to flush pending writes
     this.backend.registerUnloadHandler(() => {
       if (this.dirtyData) {
         this.saveAllDataImmediate(this.dirtyData);

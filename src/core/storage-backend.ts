@@ -115,12 +115,12 @@ class StorageBackend {
   }
 
   /**
-   * Registers a beforeunload handler for the storage backend.
+   * Registers a pagehide handler for the storage backend.
    */
   registerUnloadHandler(handler: () => void): void {
     if (isWindowAvailable() && !this.unloadHandler) {
       this.unloadHandler = handler;
-      window.addEventListener('beforeunload', this.unloadHandler);
+      window.addEventListener('pagehide', this.unloadHandler);
     }
   }
 
@@ -129,7 +129,7 @@ class StorageBackend {
    */
   cleanup(): void {
     if (isWindowAvailable() && this.unloadHandler) {
-      window.removeEventListener('beforeunload', this.unloadHandler);
+      window.removeEventListener('pagehide', this.unloadHandler);
       this.unloadHandler = null;
     }
   }
