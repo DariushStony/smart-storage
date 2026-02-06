@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@dariushstony/smart-storage - Vanilla JS Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .console-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .console-notice strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>@dariushstony/smart-storage</h1>
+        <p class="subtitle">Vanilla JavaScript Example - Interactive Demo</p>
+
+        <div class="console-notice">
+            <strong>📌 Open your browser console (F12)</strong>
+            All operations are logged to the console for detailed output.
+        </div>
+
+        <div class="section">
+            <h2>📦 Basic Operations</h2>
+            <div class="button-group">
+                <button onclick="demo.basicSet()">Store Data</button>
+                <button onclick="demo.basicGet()">Read Data</button>
+                <button onclick="demo.basicRemove()">Remove Data</button>
+                <button onclick="demo.basicClear()">Clear All</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⏱️ TTL (Auto-Expiry)</h2>
+            <div class="button-group">
+                <button onclick="demo.ttlSet()">Set with 10s TTL</button>
+                <button onclick="demo.ttlCheck()">Check Remaining</button>
+                <button onclick="demo.ttlExtend()">Extend TTL</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🗄️ Storage Types</h2>
+            <div class="button-group">
+                <button onclick="demo.useLocal()">Use localStorage</button>
+                <button onclick="demo.useSession()">Use sessionStorage</button>
+                <button onclick="demo.useMemory()">Use in-memory</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Statistics</h2>
+            <div id="stats" class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="itemCount">0</div>
+                    <div class="stat-label">Items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="sizeKB">0</div>
+                    <div class="stat-label">Size (KB)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="quota">0%</div>
+                    <div class="stat-label">Quota Used</div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button onclick="demo.showStats()">Refresh Stats</button>
+                <button onclick="demo.cleanup()">Cleanup Expired</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔍 Output</h2>
+            <div class="output" id="output">
+Welcome! Click buttons above to see storage operations in action.
+Check the browser console (F12) for detailed logs.
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Note: In production, import from npm package
+        // For this example, we'll demonstrate the API structure
+
+        // Mock implementation for demo purposes
+        // In real usage: import { getStorageSlice } from '@dariushstony/smart-storage';
+
+        function log(message) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent = `[${timestamp}] ${message}\n${output.textContent}`;
+            console.log(message);
+        }
+
+        function updateStats(stats) {
+            document.getElementById('itemCount').textContent = stats.itemCount || 0;
+            document.getElementById('sizeKB').textContent = ((stats.sizeBytes || 0) / 1024).toFixed(2);
+            document.getElementById('quota').textContent = (stats.quotaPercentage || 0).toFixed(1) + '%';
+        }
+
+        // Demo implementation (replace with real package import)
+        class DemoStorage {
+            constructor() {
+                this.data = new Map();
+            }
+
+            setItem(key, value, ttl) {
+                this.data.set(key, { value, ttl, created: Date.now() });
+                log(`✅ Set: ${key} = ${JSON.stringify(value)}${ttl ? ` (TTL: ${ttl}ms)` : ''}`);
+            }
+
+            getItem(key) {
+                const item = this.data.get(key);
+                if (!item) {
+                    log(`❌ Get: ${key} not found`);
+                    return null;
+                }
+                if (item.ttl && Date.now() - item.created > item.ttl) {
+                    this.data.delete(key);
+                    log(`⏰ Get: ${key} expired`);
+                    return null;
+                }
+                log(`✅ Get: ${key} = ${JSON.stringify(item.value)}`);
+                return item.value;
+            }
+
+            removeItem(key) {
+                const existed = this.data.delete(key);
+                log(existed ? `✅ Removed: ${key}` : `❌ Remove: ${key} not found`);
+            }
+
+            clear() {
+                const count = this.data.size;
+                this.data.clear();
+                log(`✅ Cleared ${count} items`);
+            }
+
+            getRemainingTTL(key) {
+                const item = this.data.get(key);
+                if (!item || !item.ttl) return null;
+                const elapsed = Date.now() - item.created;
+                const remaining = Math.max(0, item.ttl - elapsed);
+                log(`⏱️ Remaining TTL for ${key}: ${remaining}ms`);
+                return remaining;
+            }
+
+            extendTTL(key, additional) {
+                const item = this.data.get(key);
+                if (item) {
+                    item.ttl = (item.ttl || 0) + additional;
+                    log(`✅ Extended TTL for ${key} by ${additional}ms`);
+                }
+            }
+
+            getStats() {
+                const stats = {
+                    itemCount: this.data.size,
+                    sizeBytes: JSON.stringify([...this.data]).length * 2,
+                    quotaPercentage: 0.5,
+                    storageType: 'demo'
+                };
+                log(`📊 Stats: ${stats.itemCount} items, ${(stats.sizeBytes / 1024).toFixed(2)} KB`);
+                updateStats(stats);
+                return stats;
+            }
+
+            cleanupExpiredItems() {
+                let removed = 0;
+                for (const [key, item] of this.data) {
+                    if (item.ttl && Date.now() - item.created > item.ttl) {
+                        this.data.delete(key);
+                        removed++;
+                    }
+                }
+                log(`🧹 Cleaned up ${removed} expired items`);
+                return removed;
+            }
+        }
+
+        const storage = new DemoStorage();
+
+        // Make demo functions globally available
+        window.demo = {
+            basicSet() {
+                storage.setItem('username', 'dariush');
+                storage.setItem('settings', { theme: 'dark', lang: 'en' });
+                storage.getStats();
+            },
+
+            basicGet() {
+                storage.getItem('username');
+                storage.getItem('settings');
+            },
+
+            basicRemove() {
+                storage.removeItem('username');
+                storage.getStats();
+            },
+
+            basicClear() {
+                storage.clear();
+                storage.getStats();
+            },
+
+            ttlSet() {
+                storage.setItem('temp-token', 'abc123xyz', 10000); // 10 seconds
+                log('💡 Item will expire in 10 seconds. Click "Check Remaining" to monitor.');
+            },
+
+            ttlCheck() {
+                storage.getRemainingTTL('temp-token');
+            },
+
+            ttlExtend() {
+                storage.extendTTL('temp-token', 5000); // Add 5 more seconds
+            },
+
+            useLocal() {
+                log('🗄️ Using localStorage (persists across sessions)');
+                log('💡 In real usage: getStorageSlice("DATA", { storageType: "local" })');
+            },
+
+            useSession() {
+                log('🗄️ Using sessionStorage (cleared when tab closes)');
+                log('💡 In real usage: getStorageSlice("DATA", { storageType: "session" })');
+            },
+
+            useMemory() {
+                log('🗄️ Using in-memory storage (cleared on reload)');
+                log('💡 In real usage: getStorageSlice("DATA", { storageType: "in-memory" })');
+            },
+
+            showStats() {
+                storage.getStats();
+            },
+
+            cleanup() {
+                storage.cleanupExpiredItems();
+                storage.getStats();
+            }
+        };
+
+        // Initial stats
+        storage.getStats();
+
+        log('🚀 Demo initialized!');
+        log('💡 This is a demo. Install: npm install @dariushstony/smart-storage');
+    </script>
+</body>
+</html>

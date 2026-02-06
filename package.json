@@ -1,0 +1,90 @@
+{
+  "name": "@dariushstony/smart-storage",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DariushStony/smart-storage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DariushStony/smart-storage/issues"
+  },
+  "homepage": "https://github.com/DariushStony/smart-storage#readme",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A robust, SSR-safe, production-ready wrapper around Web Storage (localStorage/sessionStorage) with TTL, transforms, debouncing, and automatic cleanup",
+  "keywords": [
+    "storage",
+    "localStorage",
+    "sessionStorage",
+    "web-storage",
+    "ttl",
+    "cache",
+    "browser-storage",
+    "ssr-safe",
+    "typescript",
+    "transform",
+    "debounce",
+    "expiration"
+  ],
+  "author": "Dariush Hadipour",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "prepare": "husky",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\"",
+    "size": "size-limit",
+    "size:check": "pnpm build && size-limit",
+    "analyze": "size-limit --why",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck",
+    "release": "semantic-release",
+    "build": "tsup"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.39.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^13.1.3",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "@size-limit/preset-small-lib": "^11.2.0",
+    "eslint": "^9.39.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.8.1",
+    "semantic-release": "^24.2.9",
+    "size-limit": "^11.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  }
+}
