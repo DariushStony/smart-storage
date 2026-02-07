@@ -156,8 +156,9 @@ class StorageVault {
     if (!storage) return {};
 
     // Return dirty data if we have pending writes (read-after-write consistency)
+    // Return a shallow copy to allow multiple setItem calls before debounced write
     if (this.dirtyData !== null) {
-      return Object.freeze(this.dirtyData ?? {});
+      return { ...(this.dirtyData ?? {}) };
     }
 
     try {
