@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/DariushStony/smart-storage/compare/v1.0.0...v1.0.1) (2026-02-07)
+
+### Bug Fixes
+
+- return a shallow copy of dirtyData to allow multiple setItem calls ([bf01dfb](https://github.com/DariushStony/smart-storage/commit/bf01dfb636900f9c243b351e32197ff94e0d9b72))
+
 # 1.0.0 (2026-02-07)
 
 ### Bug Fixes
