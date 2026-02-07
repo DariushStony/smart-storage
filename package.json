@@ -8,7 +8,7 @@
     "url": "https://github.com/DariushStony/smart-storage/issues"
   },
   "homepage": "https://github.com/DariushStony/smart-storage#readme",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": false,
   "description": "A robust, SSR-safe, production-ready wrapper around Web Storage (localStorage/sessionStorage) with TTL, transforms, debouncing, and automatic cleanup",
   "keywords": [
