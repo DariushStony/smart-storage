@@ -2,7 +2,7 @@
   "name": "@dariushstony/smart-storage",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DariushStony/smart-storage.git"
+    "url": "https://github.com/DariushStony/smart-storage.git"
   },
   "bugs": {
     "url": "https://github.com/DariushStony/smart-storage/issues"
