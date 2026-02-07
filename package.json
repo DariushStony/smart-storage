@@ -27,7 +27,6 @@
   ],
   "author": "Dariush Hadipour",
   "license": "MIT",
-  "packageManager": "pnpm@9.0.0",
   "type": "module",
   "files": [
     "dist"
