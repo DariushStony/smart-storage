@@ -5,50 +5,29 @@
  * All data is stored as a single serialized object under one key to avoid cluttering the storage space.
  *
  * @storage STORAGE TYPES:
- * - 'local': Uses localStorage (persists across browser sessions, ~5-10MB quota)
- * - 'session': Uses sessionStorage (cleared when tab closes, ~5-10MB quota)
- * - 'in-memory': Uses Map (cleared on page reload, useful for testing or temporary data)
- * Specify type via: getStorageSlice('KEY', { storageType: 'session' })
+ * - StorageType.Local: Uses localStorage (persists across browser sessions, ~5-10MB quota)
+ * - StorageType.Session: Uses sessionStorage (cleared when tab closes, ~5-10MB quota)
+ * - StorageType.InMemory: Uses Map (cleared on page reload, useful for testing or temporary data)
+ * Specify type via: getStorageSlice('KEY', { storageType: StorageType.Session })
  *
- * @security WARNING: Web Storage is accessible via JavaScript and is NOT secure for sensitive data.
- * Do NOT store authentication tokens, passwords, or other sensitive information here.
- * For sensitive data, use httpOnly cookies or secure server-side sessions instead.
- * All stored data should be treated as potentially compromised and validated on retrieval.
- *
- * @ssr HYDRATION WARNING: During server-side rendering, this vault uses in-memory storage.
- * When hydrating on the client, a new instance with localStorage will be created, but any
- * server-rendered state will be lost. If you need to preserve SSR data, pass initial data
- * as props and call setItem() in useEffect() or similar client-side hook.
- *
- * @serialization JSON LIMITATIONS: Values are serialized with JSON.stringify(), which has limitations:
- * - Functions, undefined, and Symbol values are silently dropped
- * - Date objects become strings (must be manually converted back)
- * - Circular references will throw an error
- * - Map, Set, and other non-plain objects lose their type information
- * For complex data types, serialize them manually before storing.
- *
- * @transforms TRANSFORM PIPELINE: You can chain multiple transforms (compression, encryption, encoding):
+ * @transforms TRANSFORM CHAIN (Chain of Responsibility):
  * - Transforms are applied AFTER JSON.stringify (string → string transformations)
- * - Applied in order during writes: serialize → transform1 → transform2 → ... → persist
- * - Reversed during reads: persist → reverse transformN → ... → reverse transform1 → deserialize
- * - Use for: compression (LZ-String), encryption (Web Crypto), encoding (Base64), etc.
+ * - Applied in order during writes: handler1 → handler2 → ... → persist
+ * - Reversed during reads: persist → handlerN → ... → handler1 → deserialize
+ * - Use for: compression (LZ-String), encryption (Web Crypto), encoding (Base64), logging, etc.
  *
- * @performance When to use slices (getStorageSlice):
- * - Split data by update frequency (e.g., user preferences vs. temporary cache)
- * - Isolate large datasets to avoid re-serializing everything on each write
- * - Separate critical data from experimental features
- * Example: getStorageSlice('USER_PREFS') vs getStorageSlice('TEMP_CACHE')
+ * @logging PLUGGABLE LOGGING: Logging is a chain handler, not a built-in concern.
+ * - Add `new LoggingHandler(myLogger)` to the transforms array to enable logging.
+ * - Remove it to disable logging — zero code changes, zero overhead.
  *
- * @performance DEBOUNCING: Write operations are debounced by default (100ms) to batch rapid updates.
- * - Reads always see pending writes immediately (read-after-write consistency)
- * - Pending writes are automatically flushed on page unload to prevent data loss
- * - For time-critical operations, call flush() to force immediate persistence
- * - Set debounceMs: 0 to disable debouncing (writes become synchronous)
- * - Consider higher debounceMs (200-500ms) for battery-sensitive or high-frequency scenarios
+ * @statistics PLUGGABLE STATISTICS: Statistics are a separate concern, not built into the vault.
+ * - Use `new StorageStatistics(vault)` to collect metrics on demand.
+ * - Don't create one if you don't need stats — zero overhead.
  */
 
-import { StorageVault } from './core/vault';
-import type { StorageVaultOptions } from './utils/types';
+import { StorageVault } from './vault/storage-vault';
+import { StorageType } from './storage/storage-type';
+import type { StorageVaultOptions } from './vault/types';
 
 /**
  * Creates a new StorageVault instance with a custom storage key.
@@ -60,27 +39,35 @@ import type { StorageVaultOptions } from './utils/types';
  *
  * @example
  * // Using different storage types
- * const persistent = getStorageSlice('USER_PREFS', { storageType: 'local' }); // Persists across sessions
- * const temporary = getStorageSlice('SESSION_DATA', { storageType: 'session' }); // Cleared when tab closes
- * const testData = getStorageSlice('TEST_DATA', { storageType: 'in-memory' }); // For testing, cleared on reload
+ * import { StorageType } from '@dariushstony/smart-storage';
+ *
+ * const persistent = getStorageSlice('USER_PREFS', { storageType: StorageType.Local });
+ * const temporary = getStorageSlice('SESSION_DATA', { storageType: StorageType.Session });
+ * const testData = getStorageSlice('TEST_DATA', { storageType: StorageType.InMemory });
  *
  * @example
- * // Good: Separate frequently-updated data from stable data
- * const userPrefs = getStorageSlice('USER_PREFERENCES'); // Updated rarely
- * const tempCache = getStorageSlice('TEMP_CACHE'); // Updated frequently
+ * // With logging in the chain
+ * import { LoggingHandler } from '@dariushstony/smart-storage';
  *
- * @example
- * // Using transforms
- * import LZString from 'lz-string';
- *
- * const compressionTransform = {
- *   serialize: (data: string) => LZString.compress(data),
- *   deserialize: (data: string) => LZString.decompress(data)
- * };
- *
- * const vault = getStorageSlice('LARGE_DATA', {
- *   transforms: [compressionTransform]
+ * const vault = getStorageSlice('DATA', {
+ *   transforms: [
+ *     new LoggingHandler(myLogger),  // add to enable logging
+ *     compressionTransform,
+ *   ],
  * });
+ *
+ * @example
+ * // With statistics
+ * import { StorageStatistics } from '@dariushstony/smart-storage';
+ *
+ * const vault = getStorageSlice('DATA');
+ * const stats = new StorageStatistics(
+ *   vault.getStorageAdapter(),
+ *   vault.getStorageKey(),
+ *   vault.getTransformChain(),
+ *   vault.getMaxSizeBytes(),
+ * );
+ * console.log(stats.collect(() => vault.getAllData()));
  */
 function getStorageSlice(
   sliceKey: string,
@@ -99,11 +86,6 @@ function getStorageSlice(
  * @param sliceKey - The key of the slice to dispose.
  * @param options - The same options used when creating the slice (must match exactly).
  * @returns True if the slice was found and disposed; false otherwise.
- *
- * @example
- * const tempVault = getStorageSlice('TEMP_SESSION', { storageType: 'session' });
- * // ... use vault ...
- * disposeStorageSlice('TEMP_SESSION', { storageType: 'session' }); // Clean up when done
  */
 function disposeStorageSlice(
   sliceKey: string,
@@ -115,19 +97,40 @@ function disposeStorageSlice(
   });
 }
 
+// ==================== Value Exports ====================
 export {
   // Main API functions
   getStorageSlice,
   disposeStorageSlice,
+
+  // Vault class
   StorageVault,
+
+  // Storage type constants
+  StorageType,
 };
 
+// ==================== Logger ====================
+export type { StorageLogger } from './logger/storage-logger';
+export { LoggingHandler } from './logger/logging-handler';
+
+// ==================== Storage ====================
+export type { StorageTypeValue } from './storage/storage-type';
+export type { IStorage } from './storage/storage.interface';
+
+// ==================== Transform ====================
+export type { StorageTransform } from './transform/types';
+export { TransformHandler } from './transform/transform-handler';
+export { InlineTransformHandler } from './transform/inline-transform-handler';
+export { TransformChain } from './transform/transform-chain';
+
+// ==================== Statistics ====================
+export { StorageStatistics } from './statistics/storage-statistics';
+
+// ==================== Vault Types ====================
 export type {
-  StorageType,
-  StorageLogger,
-  StorageTransform,
   StorageVaultOptions,
   StorageStats,
   StoredData,
   DataRecord,
-} from './utils/types';
+} from './vault/types';
