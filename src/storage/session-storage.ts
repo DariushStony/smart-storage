@@ -1,77 +1,45 @@
-import { isWindowAvailable } from '../utils/helpers';
-import type { StorageLogger, StorageType } from '../utils/types';
+import { isWindowAvailable } from './environment';
+import type { IStorage } from './storage.interface';
 
 /**
- * Storage backend abstraction layer.
- * Handles initialization and access to different storage types.
+ * Storage adapter using the browser's sessionStorage API.
+ * Falls back to in-memory Map if sessionStorage is not accessible
+ * (e.g., private browsing, disabled storage, SSR).
  */
-class StorageBackend {
+class SessionStorage implements IStorage {
   private storage: Storage | Map<string, string> | null = null;
   private unloadHandler: (() => void) | null = null;
 
-  constructor(
-    private storageType: StorageType,
-    private logger?: StorageLogger
-  ) {
+  constructor() {
     this.initialize();
   }
 
-  /**
-   * Initializes the storage backend based on the storage type.
-   */
   private initialize(): void {
-    // Explicitly requested in-memory storage
-    if (this.storageType === 'in-memory') {
-      this.storage = new Map();
-      return;
-    }
-
-    // Try to use web storage (localStorage or sessionStorage)
     if (isWindowAvailable()) {
       try {
-        this.storage =
-          this.storageType === 'session' ? sessionStorage : localStorage;
-      } catch (e) {
-        // Fallback to in-memory storage (Map) if accessing web storage throws an error
-        // This can happen in private browsing mode or when storage is disabled
-        this.logger?.log(
-          'Web storage is not accessible. Falling back to in-memory storage.',
-          e
-        );
+        this.storage = sessionStorage;
+      } catch {
         this.storage = new Map();
       }
     } else {
-      // SSR is expected behavior - use in-memory fallback without logging
       this.storage = new Map();
     }
   }
 
-  /**
-   * Gets the underlying storage instance.
-   */
   getStorage(): Storage | Map<string, string> | null {
     return this.storage;
   }
 
-  /**
-   * Reads data from storage.
-   */
   read(key: string): string | null {
     if (!this.storage) return null;
-
     if (this.storage instanceof Map) {
       return this.storage.get(key) ?? null;
     }
-
     return this.storage.getItem(key);
   }
 
-  /**
-   * Writes data to storage.
-   */
   write(key: string, value: string): void {
     if (!this.storage) return;
-
     if (this.storage instanceof Map) {
       this.storage.set(key, value);
     } else {
@@ -79,12 +47,8 @@ class StorageBackend {
     }
   }
 
-  /**
-   * Removes data from storage.
-   */
   remove(key: string): void {
     if (!this.storage) return;
-
     if (this.storage instanceof Map) {
       this.storage.delete(key);
     } else {
@@ -92,16 +56,10 @@ class StorageBackend {
     }
   }
 
-  /**
-   * Checks if storage is available.
-   */
   isAvailable(): boolean {
     return this.storage !== null;
   }
 
-  /**
-   * Gets the storage type.
-   */
   getStorageType():
     | 'localStorage'
     | 'sessionStorage'
@@ -109,14 +67,9 @@ class StorageBackend {
     | 'unavailable' {
     if (!this.storage) return 'unavailable';
     if (this.storage instanceof Map) return 'memory';
-    if (this.storage === localStorage) return 'localStorage';
-    if (this.storage === sessionStorage) return 'sessionStorage';
-    return 'unavailable';
+    return 'sessionStorage';
   }
 
-  /**
-   * Registers a pagehide handler for the storage backend.
-   */
   registerUnloadHandler(handler: () => void): void {
     if (isWindowAvailable() && !this.unloadHandler) {
       this.unloadHandler = handler;
@@ -124,9 +77,6 @@ class StorageBackend {
     }
   }
 
-  /**
-   * Cleans up event listeners.
-   */
   cleanup(): void {
     if (isWindowAvailable() && this.unloadHandler) {
       window.removeEventListener('pagehide', this.unloadHandler);
@@ -135,4 +85,4 @@ class StorageBackend {
   }
 }
 
-export { StorageBackend };
+export { SessionStorage };
