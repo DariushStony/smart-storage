@@ -1,6 +1,6 @@
-import { InlineTransformHandler } from './inline-transform-handler';
-import { TransformHandler } from './transform-handler';
-import type { StorageTransform } from './types';
+import { InlineTransformHandler } from './inline-transform-handler.js';
+import { TransformHandler } from './transform-handler.js';
+import type { StorageTransform } from './types.js';
 
 /**
  * Manages a Chain of Responsibility for data transformation.

@@ -1,0 +1,63 @@
+version: 2
+
+updates:
+  # ── npm (pnpm lockfile) ──────────────────────────────────────────────
+  # Everything here is a devDependency: the published package has zero
+  # runtime dependencies. Updates are grouped so a routine week lands as
+  # one or two PRs instead of a dozen.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      # Conventional Commits, so commitlint accepts the PR and
+      # semantic-release does not cut a release for tooling bumps.
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      semantic-release:
+        patterns:
+          - 'semantic-release'
+          - '@semantic-release/*'
+      linting-and-formatting:
+        patterns:
+          - 'oxlint'
+          - 'oxlint-tsgolint'
+          - 'prettier'
+          - 'lint-staged'
+          - 'husky'
+      testing:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+          - 'happy-dom'
+          - 'playwright'
+          - '@playwright/*'
+      build-tooling:
+        patterns:
+          - 'tsup'
+          - 'typescript'
+          - 'size-limit'
+          - '@size-limit/*'
+      commitlint:
+        patterns:
+          - '@commitlint/*'
+
+  # ── GitHub Actions ───────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - '*'

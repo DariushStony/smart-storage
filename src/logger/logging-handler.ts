@@ -1,5 +1,5 @@
-import { TransformHandler } from '../transform/transform-handler';
-import type { StorageLogger } from './storage-logger';
+import { TransformHandler } from '../transform/transform-handler.js';
+import type { StorageLogger } from './storage-logger.js';
 
 /**
  * A chain-of-responsibility handler that logs data as it flows through the transform chain.

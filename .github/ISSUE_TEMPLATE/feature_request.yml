@@ -1,0 +1,71 @@
+name: ✨ Feature Request
+description: Suggest a capability or improvement
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. This library aims to stay small and
+        dependency-free, so proposals that keep the bundle lean (the current
+        budget is 5 kB brotlied) have the best chance.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this idea
+          required: true
+        - label: I checked whether this can already be done with a transform handler
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case, not just the proposed API.
+      placeholder: |
+        I need to know when another tab changes a slice, so my UI can react
+        to a cart update without polling.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch the API you have in mind.
+      render: typescript
+      placeholder: |
+        const storage = getStorageSlice('CART');
+        storage.subscribe('items', (next, previous) => { /* ... */ });
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, and why they fall short.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Would this be a breaking change?
+      options:
+        - 'No — purely additive'
+        - 'Yes — changes existing behavior'
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to open a pull request for this
+          required: false

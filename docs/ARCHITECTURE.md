@@ -1,121 +1,119 @@
-# Storage Utility - Architecture Overview
+# Architecture Overview
+
+How smart-storage is put together, and why.
 
 ## 📁 File Structure
 
+```text
+src/
+├── index.ts                        # Main entry point & public API
+│
+├── vault/                          # Core logic
+│   ├── storage-vault.ts            # StorageVault class
+│   ├── helpers.ts                  # Pure utility functions
+│   ├── constants.ts                # Configuration constants
+│   └── types.ts                    # Options, stats, record types
+│
+├── storage/                        # Storage abstraction
+│   ├── storage.interface.ts        # IStorage contract
+│   ├── storage.factory.ts          # Backend selection
+│   ├── storage-type.ts             # StorageType constants
+│   ├── local-storage.ts            # localStorage adapter
+│   ├── session-storage.ts          # sessionStorage adapter
+│   ├── in-memory-storage.ts        # Map adapter
+│   └── environment.ts              # SSR detection
+│
+├── transform/                      # Transform chain
+│   ├── transform-chain.ts          # TransformChain
+│   ├── transform-handler.ts        # Abstract base handler
+│   ├── inline-transform-handler.ts # Adapter for plain transforms
+│   └── types.ts                    # StorageTransform
+│
+├── logger/                         # Pluggable logging
+│   ├── storage-logger.ts           # StorageLogger interface
+│   └── logging-handler.ts          # Logging as a chain handler
+│
+└── statistics/                     # Pluggable statistics
+    └── storage-statistics.ts       # StorageStatistics
 ```
-storage/
-├── index.ts                    # Main entry point & public API
-├── vault.ts                    # Core StorageVault class
-├── types.ts                    # TypeScript interfaces & types
-├── constants.ts                # Configuration constants
-├── helpers.ts                  # Utility functions
-├── transforms.ts               # Transform pipeline manager
-├── storage-backend.ts          # Storage abstraction layer
-├── setup.ts                    # Setup utilities (existing)
-├── README.md                   # Documentation (existing)
-└── docs/                       # Additional docs (existing)
-```
+
+Every folder carries an `index.ts` barrel export.
 
 ## 🎯 Separation of Concerns
 
-### 1. **index.ts** - Public API
+### 1. `index.ts` — Public API
 
 - Main entry point for consumers
-- Exports public functions: `getStorageSlice()`, `disposeStorageSlice()`, `defaultStorageVault`
-- Exports types and constants
+- Exports `getStorageSlice()` and `disposeStorageSlice()`
+- Re-exports the `StorageVault` class, `StorageType`, transform and logging
+  primitives, `StorageStatistics`, and all public types
 - Contains comprehensive JSDoc
 
-### 2. **vault.ts** - Core Logic
+### 2. `vault/storage-vault.ts` — Core Logic
 
 - `StorageVault` class implementation
-- Singleton pattern management
-- All CRUD operations (setItem, getItem, updateItem, etc.)
-- TTL management
-- Debouncing logic
-- Public API methods
+- Singleton management (one instance per storage key + storage type)
+- All CRUD operations (`setItem`, `getItem`, `updateItem`, …)
+- TTL management and debouncing
 
-**Responsibilities:**
+**Responsibilities:** data lifecycle, expiry handling, read-after-write
+consistency, quota management.
 
-- Data lifecycle management
-- Expiry handling
-- Read-after-write consistency
-- Quota management
+### 3. `vault/types.ts` — Type Definitions
 
-### 3. **types.ts** - Type Definitions
-
-- All TypeScript interfaces and types
-- `StorageType`, `StorageLogger`, `StorageTransform`
 - `StorageVaultOptions`, `StorageStats`
 - `StoredData<T>`, `DataRecord`
 
-**Benefits:**
+Storage and transform types live next to their own modules
+(`storage/storage-type.ts`, `transform/types.ts`), keeping each module's
+contract beside its implementation.
 
-- Single source of truth for types
-- Easy to import and reuse
-- Clear type contracts
+### 4. `vault/constants.ts` — Configuration
 
-### 4. **constants.ts** - Configuration
-
-- Default values and magic numbers
 - `DEFAULT_STORAGE_KEY`, `DEFAULT_MAX_SIZE_BYTES`
-- `DEFAULT_DEBOUNCE_MS`, `DANGEROUS_KEYS`
+- `DEFAULT_MAX_ITEMS_IN_MEMORY`, `DEFAULT_DEBOUNCE_MS`, `DANGEROUS_KEYS`
 
-**Benefits:**
+### 5. `vault/helpers.ts` — Utility Functions
 
-- Easy to modify defaults
-- No hardcoded values in logic
-- Clear configuration
-
-### 5. **helpers.ts** - Utility Functions
-
-- Pure utility functions
 - `validateKey()`, `isExpired()`, `getByteSize()`
 - `isQuotaExceededError()`, `isCircularReferenceError()`
 - `isValidDataRecord()`
 
-**Benefits:**
+**Benefits:** testable in isolation, reusable, no side effects.
 
-- Testable in isolation
-- Reusable across modules
-- No side effects
+### 6. `transform/` — Transform Chain
 
-### 6. **transforms.ts** - Transform Pipeline
+- `TransformChain` — a Chain of Responsibility, not a flat pipeline
+- `TransformHandler` — abstract base class for custom handlers
+- `InlineTransformHandler` — adapts a plain `{ serialize, deserialize }` object
+  into a handler
 
-- `TransformPipeline` class
-- Manages chaining of transforms
-- Applies transforms in order
-- Reverses transforms on read
+**Responsibilities:** transform orchestration, error handling, chain validation.
 
-**Responsibilities:**
+### 7. `storage/` — Storage Abstraction
 
-- Transform orchestration
-- Error handling for transforms
-- Pipeline validation
+- `IStorage` — the contract every backend implements
+- `createStorage()` — factory selecting `LocalStorage`, `SessionStorage`, or
+  `InMemoryStorage`
+- `environment.ts` — SSR detection driving the in-memory fallback
 
-### 7. **storage-backend.ts** - Storage Abstraction
+**Responsibilities:** storage selection, fallback logic (SSR, private mode),
+low-level read/write, browser event management.
 
-- `StorageBackend` class
-- Abstracts localStorage/sessionStorage/Map
-- Handles storage initialization
-- Manages event listeners
+### 8. `logger/` and `statistics/` — Pluggable Concerns
 
-**Responsibilities:**
+Neither is a constructor option, and neither is built into the vault:
 
-- Storage type selection
-- Fallback logic (SSR, private mode)
-- Low-level read/write operations
-- Browser event management
+- **Logging** — add a `LoggingHandler` to the transform chain
+- **Statistics** — construct a `StorageStatistics` on demand
 
-### 8. **Documentation Files**
-
-- Usage examples and patterns
-- Documentation in `docs/` and `examples/` folders
+Skip them and you pay no cost.
 
 ## 🔄 Data Flow
 
 ### Write Flow
 
-```
+```text
 User Code
     ↓
 StorageVault.setItem()
@@ -128,14 +126,14 @@ saveAllDataImmediate()
     ↓
 JSON.stringify() → DataRecord to JSON string
     ↓
-TransformPipeline.apply() → transform1 → transform2 → ...
+TransformChain.apply() → handler₁ → handler₂ → ...
     ↓
-StorageBackend.write() → Web Storage or Map
+IStorage.write() → Web Storage or Map
 ```
 
 ### Read Flow
 
-```
+```text
 User Code
     ↓
 StorageVault.getItem()
@@ -144,16 +142,16 @@ getAllData()
     ↓
 Check dirtyData (pending writes)
     ↓
-StorageBackend.read() → raw string from storage
+IStorage.read() → raw string from storage
     ↓
-TransformPipeline.reverse() → transformN → ... → transform1
+TransformChain.reverse() → handlerₙ → ... → handler₁
     ↓
 JSON.parse() → DataRecord
     ↓
 Check expiry → return value or null
 ```
 
-## 🚀 Transform Pipeline
+## 🚀 Transform Chain
 
 ### Architecture
 
@@ -164,11 +162,14 @@ interface StorageTransform {
 }
 ```
 
+Plain objects like the above are accepted and wrapped automatically. For
+stateful or reusable transforms, extend `TransformHandler` instead.
+
 ### Flow
 
-```
-Write: JSON → transform₁ → transform₂ → ... → transformₙ → storage
-Read:  storage → reverse transformₙ → ... → reverse transform₁ → JSON
+```text
+Write: JSON → handler₁ → handler₂ → ... → handlerₙ → storage
+Read:  storage → reverse handlerₙ → ... → reverse handler₁ → JSON
 ```
 
 ### Use Cases
@@ -181,44 +182,55 @@ Read:  storage → reverse transformₙ → ... → reverse transform₁ → JSO
 
 ## 📊 Class Diagram
 
+```text
+┌──────────────────────────┐
+│   StorageVault           │
+│  (main coordinator)      │
+├──────────────────────────┤
+│ - storage: IStorage      │──────────┐
+│ - transformChain         │────┐     │
+│ - storageKey             │    │     │
+│ - maxSizeBytes           │    │     │
+│ - maxItemsInMemory       │    │     │
+│ - debounceMs             │    │     │
+│ - dirtyData              │    │     │
+├──────────────────────────┤    │     │
+│ + setItem()              │    │     │
+│ + getItem()              │    │     │
+│ + updateItem()           │    │     │
+│ + removeItem()           │    │     │
+│ + clear()                │    │     │
+│ + flush()                │    │     │
+│ + getAllData()           │    │     │
+└──────────────────────────┘    │     │
+                                ▼     ▼
+             ┌──────────────────┐   ┌──────────────────┐
+             │ TransformChain   │   │ IStorage         │
+             ├──────────────────┤   │  (interface)     │
+             │ - handlers[]     │   ├──────────────────┤
+             ├──────────────────┤   │ + read()         │
+             │ + apply()        │   │ + write()        │
+             │ + reverse()      │   │ + remove()       │
+             │ + hasTransforms()│   │ + isAvailable()  │
+             │ + from() [static]│   │ + getStorage()   │
+             └──────────────────┘   │ + getStorageType()│
+                      ▲             │ + cleanup()      │
+                      │             └──────────────────┘
+             ┌──────────────────┐            ▲
+             │ TransformHandler │            │
+             │   (abstract)     │   ┌────────┴────────┬─────────────┐
+             ├──────────────────┤   │                 │             │
+             │ # process()      │  LocalStorage  SessionStorage  InMemoryStorage
+             └──────────────────┘
+                      ▲
+       ┌──────────────┴──────────────┐
+       │                             │
+ LoggingHandler          InlineTransformHandler
 ```
-┌─────────────────────────┐
-│   StorageVault          │
-│  (main coordinator)     │
-├─────────────────────────┤
-│ - backend              │─────┐
-│ - transformPipeline    │─┐   │
-│ - storageKey           │ │   │
-│ - logger               │ │   │
-│ - debounceMs           │ │   │
-│ - dirtyData            │ │   │
-├─────────────────────────┤ │   │
-│ + setItem()            │ │   │
-│ + getItem()            │ │   │
-│ + updateItem()         │ │   │
-│ + removeItem()         │ │   │
-│ + clear()              │ │   │
-│ + flush()              │ │   │
-│ + getStats()           │ │   │
-└─────────────────────────┘ │   │
-                            │   │
-         ┌──────────────────┘   │
-         │                      │
-         ▼                      ▼
-┌─────────────────┐   ┌──────────────────┐
-│ TransformPipe.. │   │ StorageBackend   │
-├─────────────────┤   ├──────────────────┤
-│ - transforms[]  │   │ - storage        │
-│ - logger        │   │ - storageType    │
-├─────────────────┤   │ - unloadHandler  │
-│ + apply()       │   ├──────────────────┤
-│ + reverse()     │   │ + read()         │
-└─────────────────┘   │ + write()        │
-                      │ + remove()       │
-                      │ + isAvailable()  │
-                      │ + cleanup()      │
-                      └──────────────────┘
-```
+
+`StorageStatistics` sits outside the vault entirely — it is constructed from the
+vault's accessors (`getStorageAdapter()`, `getStorageKey()`,
+`getTransformChain()`, `getMaxSizeBytes()`) and reads through a callback.
 
 ## 🎨 Design Patterns Used
 
@@ -227,86 +239,88 @@ Read:  storage → reverse transformₙ → ... → reverse transform₁ → JSO
 - `StorageVault.getInstance()` ensures one instance per storage key + type
 - Prevents data duplication and sync issues
 
-### 2. **Strategy Pattern**
+### 2. **Chain of Responsibility**
 
-- `StorageTransform` interface allows pluggable transformation strategies
+- `TransformChain` links `TransformHandler` instances, each deciding what to do
+  and delegating onward
+- Logging is just another handler in the chain
+
+### 3. **Strategy Pattern**
+
+- `StorageTransform` allows pluggable transformation strategies
 - Different transforms can be swapped without changing core logic
 
-### 3. **Facade Pattern**
+### 4. **Facade Pattern**
 
-- `StorageVault` provides simple API hiding complex internal operations
-- Users don't need to know about transforms, debouncing, or backends
+- `StorageVault` provides a simple API hiding transforms, debouncing, backends
 
-### 4. **Adapter Pattern**
+### 5. **Adapter Pattern**
 
-- `StorageBackend` adapts different storage types (localStorage, sessionStorage, Map)
-- Uniform interface regardless of underlying storage
+- `IStorage` implementations adapt localStorage, sessionStorage, and `Map`
+- `InlineTransformHandler` adapts plain transform objects into handlers
 
-### 5. **Pipeline Pattern**
+### 6. **Factory Pattern**
 
-- `TransformPipeline` chains multiple transforms
-- Composable and extensible
+- `createStorage()` selects the backend from a `StorageTypeValue`
 
-## ✅ Benefits of Refactoring
-
-### Before (1141 lines, one file)
-
-- ❌ Hard to navigate and understand
-- ❌ Difficult to test individual pieces
-- ❌ Tight coupling between concerns
-- ❌ Hard to extend with new features
-
-### After (8 files, ~200 lines each)
+## ✅ Benefits of the Modular Layout
 
 - ✅ Clear separation of concerns
 - ✅ Easy to test each module
-- ✅ Loose coupling via interfaces
+- ✅ Loose coupling via interfaces (`IStorage`, `StorageTransform`)
 - ✅ Easy to add new transforms or storage types
-- ✅ Better code organization
-- ✅ More maintainable and scalable
+- ✅ Optional concerns (logging, statistics) cost nothing when unused
 - ✅ Clear module boundaries
 
 ## 🔧 Extensibility Examples
 
 ### Adding a New Storage Type
 
-1. Update `StorageType` in `types.ts`
-2. Modify `StorageBackend.initialize()` in `storage-backend.ts`
+1. Add the constant to `storage/storage-type.ts`
+2. Implement `IStorage` in a new adapter under `storage/`
+3. Add the case to `createStorage()` in `storage/storage.factory.ts` — the
+   `never` exhaustiveness check will flag it if you forget
 
 ### Adding a New Transform
 
-1. Implement `StorageTransform` interface
-2. Pass to `getStorageSlice({ transforms: [...] })`
+1. Extend `TransformHandler` (or write a plain `StorageTransform` object)
+2. Pass it via `getStorageSlice(key, { transforms: [...] })`
 
 ### Adding a New Utility
 
-1. Add pure function to `helpers.ts`
-2. Import and use in `vault.ts`
+1. Add a pure function to `vault/helpers.ts`
+2. Import and use it in `vault/storage-vault.ts`
 
 ## 📚 Import Examples
 
 ```typescript
 // Main API
-import { getStorageSlice, defaultStorageVault } from '@/utils/storage';
+import {
+  getStorageSlice,
+  disposeStorageSlice,
+} from '@dariushstony/smart-storage';
 
 // Types
-import type { StorageTransform, StorageVaultOptions } from '@/utils/storage';
+import type {
+  StorageTransform,
+  StorageVaultOptions,
+} from '@dariushstony/smart-storage';
 
-// Constants (for advanced usage)
-import { DEFAULT_DEBOUNCE_MS } from '@/utils/storage';
-
-// Class (for direct instantiation - rare)
-import { StorageVault } from '@/utils/storage';
+// Class (for direct instantiation — rare)
+import { StorageVault } from '@dariushstony/smart-storage';
 ```
 
 ## 🧪 Testing Strategy
 
 Each module can be tested independently:
 
-- **helpers.ts** - Pure functions, easy unit tests
-- **transforms.ts** - Mock transforms, test pipeline
-- **storage-backend.ts** - Mock storage types
-- **vault.ts** - Integration tests with mocked dependencies
+- **`vault/helpers.ts`** — pure functions, easy unit tests
+- **`transform/`** — mock handlers, test chain ordering and reversal
+- **`storage/`** — swap in `InMemoryStorage`, or mock `IStorage`
+- **`vault/storage-vault.ts`** — integration tests with mocked dependencies
+
+Use `storageType: 'in-memory'` with `debounceMs: 0` for deterministic tests, and
+`StorageVault.clearAllInstances()` in teardown.
 
 ## 📈 Performance Characteristics
 
@@ -317,7 +331,7 @@ Each module can be tested independently:
 
 ## 🔐 Security Considerations
 
-1. **Transform Pipeline** - Allows encryption for sensitive data
+1. **Transform Chain** - Allows encryption for sensitive data
 2. **Dangerous Keys** - Prevents prototype pollution
 3. **Validation** - All keys validated before use
 4. **SSR Safety** - Fallback to in-memory storage
@@ -328,7 +342,7 @@ Each module can be tested independently:
 1. Use **slices** for different data domains
 2. Use **transforms** for large or sensitive data
 3. Call **flush()** before critical navigation
-4. Monitor **getStats()** for quota usage
+4. Monitor quota with **`StorageStatistics.collect()`**
 5. Handle **expired items** with cleanup
 6. Use **debouncing** for high-frequency writes
-7. Provide **logger** for production error tracking
+7. Add a **`LoggingHandler`** for production error tracking

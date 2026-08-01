@@ -1,1 +1,1 @@
-export { StorageStatistics } from './storage-statistics';
+export { StorageStatistics } from './storage-statistics.js';

@@ -1,0 +1,115 @@
+name: 🐛 Bug Report
+description: Something is not behaving as documented
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report.
+
+        ⚠️ **Do not report security vulnerabilities here.** Use the
+        [Security tab](https://github.com/DariushStony/smart-storage/security)
+        instead — see [SECURITY.md](https://github.com/DariushStony/smart-storage/blob/main/SECURITY.md).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I am using a supported version (1.x)
+          required: true
+        - label: This is not a report that Web Storage is readable by client-side JavaScript (that is expected — see the README security note)
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: Output of `npm ls @dariushstony/smart-storage`
+      placeholder: 1.0.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage-type
+    attributes:
+      label: Storage type
+      description: Which backend were you using?
+      options:
+        - "'local' (localStorage)"
+        - "'session' (sessionStorage)"
+        - "'in-memory' (Map)"
+        - Multiple / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Browser only
+        - SSR framework (Next.js, Nuxt, Remix, …)
+        - Node.js / test runner
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you observe, and what did you expect instead?
+      placeholder: |
+        Expected: getItem('theme') returns 'dark' after setItem
+        Actual:   getItem('theme') returns null
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The smallest snippet that shows the problem.
+      render: typescript
+      placeholder: |
+        import { getStorageSlice } from '@dariushstony/smart-storage';
+
+        const storage = getStorageSlice('REPRO', { debounceMs: 0 });
+        storage.setItem('theme', 'dark');
+        console.log(storage.getItem('theme')); // → null, expected 'dark'
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Slice options
+      description: The options passed to `getStorageSlice()`, if any.
+      render: typescript
+      placeholder: |
+        { storageType: 'session', debounceMs: 0, transforms: [...] }
+    validations:
+      required: false
+
+  - type: textarea
+    id: system
+    attributes:
+      label: Browser / runtime versions
+      placeholder: |
+        Browser: Chrome 120
+        Node.js: v24.11.0
+        Framework: Next.js 15.1.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Logs, screenshots, or context that might help.
+    validations:
+      required: false

@@ -1,7 +1,7 @@
-import type { IStorage } from '../storage/storage.interface';
-import type { TransformChain } from '../transform/transform-chain';
-import { getByteSize } from '../vault/helpers';
-import type { DataRecord, StorageStats } from '../vault/types';
+import type { IStorage } from '../storage/storage.interface.js';
+import type { TransformChain } from '../transform/transform-chain.js';
+import { getByteSize } from '../vault/helpers.js';
+import type { DataRecord, StorageStats } from '../vault/types.js';
 
 /**
  * Collects storage statistics independently from the vault.

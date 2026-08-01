@@ -1,7 +1,7 @@
-import type { StorageTypeValue } from '../storage/storage-type';
-import type { TransformChain } from '../transform/transform-chain';
-import type { TransformHandler } from '../transform/transform-handler';
-import type { StorageTransform } from '../transform/types';
+import type { StorageTypeValue } from '../storage/storage-type.js';
+import type { TransformChain } from '../transform/transform-chain.js';
+import type { TransformHandler } from '../transform/transform-handler.js';
+import type { StorageTransform } from '../transform/types.js';
 
 /**
  * Internal structure for storing data with expiry information.

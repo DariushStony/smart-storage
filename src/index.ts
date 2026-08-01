@@ -25,9 +25,9 @@
  * - Don't create one if you don't need stats — zero overhead.
  */
 
-import { StorageVault } from './vault/storage-vault';
-import { StorageType } from './storage/storage-type';
-import type { StorageVaultOptions } from './vault/types';
+import { StorageVault } from './vault/storage-vault.js';
+import { StorageType } from './storage/storage-type.js';
+import type { StorageVaultOptions } from './vault/types.js';
 
 /**
  * Creates a new StorageVault instance with a custom storage key.
@@ -111,21 +111,21 @@ export {
 };
 
 // ==================== Logger ====================
-export type { StorageLogger } from './logger/storage-logger';
-export { LoggingHandler } from './logger/logging-handler';
+export type { StorageLogger } from './logger/storage-logger.js';
+export { LoggingHandler } from './logger/logging-handler.js';
 
 // ==================== Storage ====================
-export type { StorageTypeValue } from './storage/storage-type';
-export type { IStorage } from './storage/storage.interface';
+export type { StorageTypeValue } from './storage/storage-type.js';
+export type { IStorage } from './storage/storage.interface.js';
 
 // ==================== Transform ====================
-export type { StorageTransform } from './transform/types';
-export { TransformHandler } from './transform/transform-handler';
-export { InlineTransformHandler } from './transform/inline-transform-handler';
-export { TransformChain } from './transform/transform-chain';
+export type { StorageTransform } from './transform/types.js';
+export { TransformHandler } from './transform/transform-handler.js';
+export { InlineTransformHandler } from './transform/inline-transform-handler.js';
+export { TransformChain } from './transform/transform-chain.js';
 
 // ==================== Statistics ====================
-export { StorageStatistics } from './statistics/storage-statistics';
+export { StorageStatistics } from './statistics/storage-statistics.js';
 
 // ==================== Vault Types ====================
 export type {
@@ -133,4 +133,4 @@ export type {
   StorageStats,
   StoredData,
   DataRecord,
-} from './vault/types';
+} from './vault/types.js';

@@ -39,10 +39,7 @@ interface IStorage {
    * Returns a human-readable label for the storage type.
    */
   getStorageType():
-    | 'localStorage'
-    | 'sessionStorage'
-    | 'memory'
-    | 'unavailable';
+    'localStorage' | 'sessionStorage' | 'memory' | 'unavailable';
 
   /**
    * Registers a handler to be called on page unload (pagehide).

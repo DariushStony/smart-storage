@@ -6,8 +6,19 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- pnpm 8 or higher (recommended)
+- Node.js 24 or higher (required by the current dev toolchain)
+- pnpm 11.18.0
+
+The pnpm version is pinned in the `packageManager` field of `package.json`. With
+[Corepack](https://nodejs.org/api/corepack.html) enabled, the correct version is
+selected automatically:
+
+```bash
+corepack enable
+```
+
+> **Note:** These are requirements for _developing_ the package. The published
+> library itself has no such constraint — see the README for runtime support.
 
 ### Setup
 
@@ -48,10 +59,17 @@ Thank you for your interest in contributing! This document provides guidelines a
 # Development
 pnpm build          # Build the package
 pnpm clean          # Clean build output
-pnpm typecheck      # Type check with TypeScript
+pnpm typecheck      # Type check src and tests
+
+# Testing
+pnpm test           # Unit tests (Vitest + happy-dom)
+pnpm test:watch     # Unit tests in watch mode
+pnpm test:coverage  # Unit tests with a coverage report
+pnpm test:e2e       # E2E tests (Playwright, real Chromium; builds first)
+pnpm test:all       # Unit + E2E
 
 # Code Quality
-pnpm lint           # Lint the code
+pnpm lint           # Lint with oxlint (type-aware)
 pnpm lint:fix       # Lint and auto-fix issues
 pnpm format         # Format code with Prettier
 pnpm format:check   # Check code formatting
@@ -164,25 +182,91 @@ function getItem(key: any): any {
 2. External dependencies
 3. Internal dependencies
 
+Relative imports **must** carry an explicit `.js` extension, even though the
+source files are `.ts`. Declarations are emitted by `tsc`, and extensionless
+specifiers break consumers using `node16`/`nodenext` module resolution.
+
 ```typescript
-import type { StorageType, StorageLogger } from './types';
-import { DEFAULT_DEBOUNCE_MS } from './constants';
-import { validateKey, isExpired } from './helpers';
+import type { StorageTypeValue, StorageLogger } from './types.js';
+import { DEFAULT_DEBOUNCE_MS } from './constants.js';
+import { validateKey, isExpired } from './helpers.js';
 ```
 
 ## 🧪 Testing
 
-When adding new features, consider adding tests:
+New behavior needs tests, and bug fixes need a test that fails before the fix.
+
+### Layout
+
+```text
+tests/
+├── unit/           # Vitest + happy-dom -- fast, covers all logic
+│   ├── helpers.test.ts
+│   ├── transform.test.ts
+│   ├── storage.test.ts
+│   ├── storage-vault.test.ts
+│   ├── statistics.test.ts
+│   └── public-api.test.ts
+└── e2e/            # Playwright + real Chromium
+    ├── harness.html      # loads the built bundle
+    ├── server.mjs        # dependency-free static server
+    └── storage.e2e.ts
+```
+
+### Which layer?
+
+Default to **unit**. Reach for **e2e** only when a simulated DOM cannot honestly
+prove the behavior:
+
+| Use unit tests for                     | Use e2e tests for                      |
+| -------------------------------------- | -------------------------------------- |
+| TTL arithmetic, expiry, cleanup        | Persistence across a real page reload  |
+| Transform chain ordering               | `sessionStorage` clearing with the tab |
+| Singleton identity, disposal           | Real `pagehide` flushing               |
+| Key validation, prototype-pollution    | Genuine quota pressure                 |
+| Debounce coalescing (with fake timers) | Cross-tab visibility                   |
+
+E2E specs run against `dist/`, so they verify the **shipped artifact**;
+`pnpm test:e2e` builds first via `pretest:e2e`.
+
+### Writing a unit test
+
+Vaults are singletons, so isolate each test with a unique slice key and clear
+the cache afterwards:
 
 ```typescript
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { StorageType } from '../../src/storage/storage-type.js';
+import { StorageVault } from '../../src/vault/storage-vault.js';
+
+afterEach(() => {
+  StorageVault.clearAllInstances();
+});
+
 describe('StorageVault', () => {
-  it('should store and retrieve data', () => {
-    const vault = getStorageSlice('TEST');
+  it('stores and retrieves data', () => {
+    const vault = StorageVault.getInstance({
+      storageKey: 'TEST_UNIQUE_KEY',
+      storageType: StorageType.InMemory, // isolated, no real storage
+      debounceMs: 0, // observe writes synchronously
+    });
+
     vault.setItem('key', 'value');
+
     expect(vault.getItem('key')).toBe('value');
   });
 });
 ```
+
+Use `vi.useFakeTimers()` for anything involving TTL or debouncing rather than
+sleeping in real time.
+
+### Coverage
+
+`pnpm test:coverage` prints a report. There is deliberately **no threshold
+gate** — add one once the numbers have settled rather than picking a figure up
+front.
 
 ## 📚 Documentation
 
@@ -245,8 +329,8 @@ What actually happens
 **Environment:**
 
 - Browser: Chrome 120
-- Node.js: v20.10.0
-- Package version: 0.1.0
+- Node.js: v24.11.0
+- Package version: 1.0.1
 
 **Code Sample:**
 \`\`\`typescript
@@ -282,25 +366,42 @@ All submissions require review. We use GitHub Pull Requests for this:
 
 ## 🎯 Project Structure
 
-```
+```text
 src/
-├── core/              # Core implementation
-│   ├── vault.ts       # Main StorageVault class
-│   └── storage-backend.ts
-├── transforms/        # Transform pipeline
-│   └── pipeline.ts
-├── utils/             # Utilities
-│   ├── types.ts       # Type definitions
-│   ├── constants.ts   # Configuration
-│   └── helpers.ts     # Helper functions
-└── index.ts           # Public API
+├── vault/                      # Core implementation
+│   ├── storage-vault.ts        # Main StorageVault class
+│   ├── helpers.ts              # Validation and expiry helpers
+│   ├── constants.ts            # Defaults and dangerous-key list
+│   └── types.ts                # StorageVaultOptions, StorageStats, ...
+├── storage/                    # Storage backends
+│   ├── storage.interface.ts    # IStorage contract
+│   ├── storage.factory.ts      # Backend selection
+│   ├── storage-type.ts         # StorageType constants
+│   ├── local-storage.ts        # localStorage adapter
+│   ├── session-storage.ts      # sessionStorage adapter
+│   ├── in-memory-storage.ts    # Map adapter (SSR/testing)
+│   └── environment.ts          # SSR detection
+├── transform/                  # Transform chain
+│   ├── transform-chain.ts      # Chain of Responsibility
+│   ├── transform-handler.ts    # Base handler class
+│   ├── inline-transform-handler.ts
+│   └── types.ts                # StorageTransform
+├── logger/                     # Pluggable logging
+│   ├── storage-logger.ts       # StorageLogger interface
+│   └── logging-handler.ts      # Logging as a chain handler
+├── statistics/                 # Pluggable statistics
+│   └── storage-statistics.ts   # StorageStatistics
+└── index.ts                    # Public API
 ```
+
+Each folder has an `index.ts` barrel file re-exporting its public pieces.
 
 ## 🤝 Community
 
 - Be respectful and constructive
 - Help others when you can
 - Follow the [Code of Conduct](./CODE_OF_CONDUCT.md)
+- Report vulnerabilities privately per the [Security Policy](./SECURITY.md)
 
 ## 📜 License
 

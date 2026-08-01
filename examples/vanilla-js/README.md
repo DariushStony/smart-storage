@@ -74,8 +74,17 @@ const memory = getStorageSlice('TEST', { storageType: 'in-memory' });
 ### Monitoring & Stats
 
 ```javascript
-// Get storage statistics
-const stats = storage.getStats();
+import { StorageStatistics } from '@dariushstony/smart-storage';
+
+// Statistics are opt-in — build one from the vault's accessors
+const statistics = new StorageStatistics(
+  storage.getStorageAdapter(),
+  storage.getStorageKey(),
+  storage.getTransformChain(),
+  storage.getMaxSizeBytes()
+);
+
+const stats = statistics.collect(() => storage.getAllData());
 console.log(`Items: ${stats.itemCount}`);
 console.log(`Size: ${(stats.sizeBytes / 1024).toFixed(2)} KB`);
 console.log(`Quota: ${stats.quotaPercentage.toFixed(1)}%`);
@@ -89,4 +98,5 @@ console.log(`Removed ${removed} expired items`);
 
 - Read the [complete API documentation](../../README.md)
 - Learn about [transforms](../../README.md#-transform-pipeline)
+- See the [singleton behavior](../../docs/SINGLETON_PATTERN_VISUAL.md)
 - Understand the [architecture](../../docs/ARCHITECTURE.md)

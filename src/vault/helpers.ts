@@ -1,4 +1,4 @@
-import { DANGEROUS_KEYS } from './constants';
+import { DANGEROUS_KEYS } from './constants.js';
 
 /**
  * Validates a storage key.

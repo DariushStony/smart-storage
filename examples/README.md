@@ -84,7 +84,7 @@ testStorage.setItem('key', 'value');
 
 ## 🔧 Advanced Examples
 
-### Transform Pipeline (Compression)
+### Transform Chain (Compression)
 
 ```typescript
 import { getStorageSlice } from '@dariushstony/smart-storage';
@@ -105,8 +105,11 @@ vault.setItem('bigObject', largeData); // Automatically compressed
 
 ### Custom Logger Integration
 
+Logging is opt-in: add a `LoggingHandler` to the transform chain rather than
+passing a logger option.
+
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
 import type { StorageLogger } from '@dariushstony/smart-storage';
 
 const logger: StorageLogger = {
@@ -116,7 +119,9 @@ const logger: StorageLogger = {
   },
 };
 
-const vault = getStorageSlice('APP', { logger });
+const vault = getStorageSlice('APP', {
+  transforms: [new LoggingHandler(logger)],
+});
 ```
 
 ## 📖 Documentation

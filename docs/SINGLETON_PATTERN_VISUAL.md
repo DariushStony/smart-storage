@@ -1,120 +1,87 @@
 # 🎯 Singleton Pattern - Visual Guide
 
+`getStorageSlice()` returns a **singleton per slice**. Ask for the same slice
+from anywhere in your app and you get the same instance, backed by the same
+storage key.
+
 ## The Big Picture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Your DK Application                       │
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                       Your application                       │
 │                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Component A  │  │ Component B  │  │ Component C  │      │
-│  │              │  │              │  │              │      │
-│  │ Theme Switch │  │ Product Page │  │ Cart         │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         │                 │                 │               │
-│         │ import          │ import          │ import        │
-│         ▼                 ▼                 ▼               │
-│  ┌──────────────────────────────────────────────────┐      │
-│  │   import { dkStorage } from '@dk/.../storage'    │      │
-│  └──────────────────────┬───────────────────────────┘      │
-│                         │                                   │
-│                         │ All point to                      │
-│                         │ same instance                     │
-│                         ▼                                   │
-│  ┌──────────────────────────────────────────────────┐      │
-│  │                                                   │      │
-│  │              🏰 dkStorage                        │      │
-│  │            (ONE Singleton Instance)              │      │
-│  │                                                   │      │
-│  │  Data stored with key prefixes:                  │      │
-│  │  • user:theme        = "dark"                    │      │
-│  │  • cache:product-123 = {...}                     │      │
-│  │  • cart:items        = [...]                     │      │
-│  │  • feature:new-ui    = true                      │      │
-│  │  • exp:banner-test   = true                      │      │
-│  │                                                   │      │
-│  └───────────────────┬───────────────────────────────┘      │
-│                      │                                      │
-│                      ▼                                      │
-│            ┌──────────────────┐                            │
-│            │  localStorage     │                            │
-│            │  Key: DK_STORAGE  │                            │
-│            └──────────────────┘                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │ Component A  │  │ Component B  │  │ Component C  │        │
+│  │              │  │              │  │              │        │
+│  │ Theme Switch │  │ Product Page │  │ Cart         │        │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘        │
+│         │                 │                 │                │
+│         │ getStorageSlice('MY_APP')         │                │
+│         ▼                 ▼                 ▼                │
+│  ┌────────────────────────────────────────────────────┐      │
+│  │        getStorageSlice('MY_APP')                   │      │
+│  └───────────────────────┬────────────────────────────┘      │
+│                          │                                   │
+│                          │ All resolve to the                │
+│                          │ same instance                     │
+│                          ▼                                   │
+│  ┌────────────────────────────────────────────────────┐      │
+│  │              🏰 StorageVault                       │      │
+│  │            (ONE instance per slice)                │      │
+│  │                                                    │      │
+│  │  Data stored with key prefixes:                    │      │
+│  │  • user:theme        = "dark"                      │      │
+│  │  • cache:product-123 = {...}                       │      │
+│  │  • cart:items        = [...]                       │      │
+│  │  • feature:new-ui    = true                        │      │
+│  │  • exp:banner-test   = true                        │      │
+│  │                                                    │      │
+│  └───────────────────────┬────────────────────────────┘      │
+│                          │                                   │
+│                          ▼                                   │
+│                ┌─────────────────────┐                       │
+│                │  localStorage       │                       │
+│                │  Key: "MY_APP"      │                       │
+│                │  (one JSON blob)    │                       │
+│                └─────────────────────┘                       │
 │                                                              │
-└─────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────┘
 ```
+
+All of a slice's data lives in **one** JSON blob under **one** storage key. That
+keeps the storage namespace clean and makes reads and writes a single operation.
 
 ---
 
-## Before vs After
+## What Makes an Instance Unique
 
-### ❌ Before (Multiple Vaults)
+The instance cache is keyed by `storageType` + `storageKey` — nothing else:
 
-```
-Component A                 Component B                 Component C
-    │                           │                           │
-    │ import userPrefsVault     │ import cacheVault        │ import cartVault
-    ▼                           ▼                           ▼
-┌──────────┐              ┌──────────┐              ┌──────────┐
-│ userPrefs│              │  cache   │              │   cart   │
-│  Vault   │              │  Vault   │              │  Vault   │
-└────┬─────┘              └────┬─────┘              └────┬─────┘
-     │                         │                         │
-     ▼                         ▼                         ▼
-┌──────────┐              ┌──────────┐              ┌──────────┐
-│localStorage│            │localStorage│            │localStorage│
-│DK_USER_   │            │DK_API_    │            │DK_CART    │
-│PREFS      │            │CACHE      │            │           │
-└──────────┘              └──────────┘              └──────────┘
+```text
+                cache key = `${storageType}-${storageKey}`
 
-❌ Problems:
-• 8 different imports to remember
-• 8 different localStorage keys
-• Need to know which vault for what
-• More complex mental model
+getStorageSlice('MY_APP')                        → "local-MY_APP"     ┐
+getStorageSlice('MY_APP', { debounceMs: 500 })   → "local-MY_APP"     ├─ SAME
+getStorageSlice('MY_APP', { storageType:'local'})→ "local-MY_APP"     ┘
+
+getStorageSlice('OTHER')                         → "local-OTHER"      ← different
+getStorageSlice('MY_APP', {storageType:'session'})→ "session-MY_APP"  ← different
 ```
 
-### ✅ After (Singleton)
-
-```
-Component A                 Component B                 Component C
-    │                           │                           │
-    │ import dkStorage          │ import dkStorage         │ import dkStorage
-    ▼                           ▼                           ▼
-                    ┌───────────────────────┐
-                    │                       │
-                    │      dkStorage        │
-                    │   (ONE Instance)      │
-                    │                       │
-                    │  user:theme           │
-                    │  cache:products       │
-                    │  cart:items           │
-                    │  feature:new-ui       │
-                    │  exp:test-1           │
-                    │                       │
-                    └───────────┬───────────┘
-                                │
-                                ▼
-                        ┌──────────────┐
-                        │ localStorage  │
-                        │ DK_STORAGE    │
-                        └──────────────┘
-
-✅ Benefits:
-• 1 import for everything
-• 1 localStorage key
-• Simple key prefixes
-• Easy mental model
-```
+> ⚠️ **Important:** because only the type and key form the cache key, options
+> like `debounceMs`, `transforms`, or `maxSizeBytes` are applied **only when the
+> instance is first created**. A later call with different options returns the
+> existing instance, still using its original configuration. Configure a slice
+> in one place.
 
 ---
 
 ## Data Flow Example
 
-```
+```text
 1. Component A stores theme
    ┌─────────────────────────┐
-   │ dkStorage.setItem(      │
+   │ storage.setItem(        │
    │   'user:theme',         │
    │   'dark'                │
    │ );                      │
@@ -122,7 +89,7 @@ Component A                 Component B                 Component C
                │
                ▼
    ┌─────────────────────────┐
-   │   dkStorage Instance    │
+   │  StorageVault instance  │
    │                         │
    │ {                       │
    │   "user:theme": {       │
@@ -135,25 +102,31 @@ Component A                 Component B                 Component C
                ▼
    ┌─────────────────────────┐
    │   localStorage          │
-   │   Key: "DK_STORAGE"     │
+   │   Key: "MY_APP"         │
    └─────────────────────────┘
 
 2. Component B reads theme (same instance!)
    ┌─────────────────────────┐
    │ const theme =           │
-   │   dkStorage.getItem(    │
+   │   storage.getItem(      │
    │     'user:theme'        │
    │   );                    │
    │ // Returns: "dark" ✅   │
    └─────────────────────────┘
 ```
 
+Reads see pending debounced writes immediately (read-after-write consistency),
+so step 2 returns `"dark"` even if the write has not hit storage yet.
+
 ---
 
-## Key Naming Structure
+## Key Naming Convention
 
-```
-dkStorage
+Since a slice holds one blob, prefixes keep it organized. This is a convention,
+not something the library enforces:
+
+```text
+MY_APP (one slice)
 │
 ├─ user:*           → User data
 │  ├─ user:id
@@ -194,172 +167,85 @@ dkStorage
 
 ---
 
-## Real Code Comparison
+## One Slice or Many?
 
-### User Theme Example
-
-```typescript
-// ❌ Before (Multiple Vaults)
-import { userPrefsVault } from '@dk/shared/utils/storage';
-
-userPrefsVault.setItem('theme', 'dark');
-const theme = userPrefsVault.getItem('theme');
-
-// ✅ After (Singleton)
-import { dkStorage } from '@dk/shared/utils/storage';
-
-dkStorage.setItem('user:theme', 'dark');
-const theme = dkStorage.getItem('user:theme');
-```
-
-### Product Cache Example
+Prefixes within one slice, or separate slices? Both are valid — the trade-off is
+write cost versus isolation.
 
 ```typescript
-// ❌ Before (Multiple Vaults)
-import { cacheVault } from '@dk/shared/utils/storage';
+import { getStorageSlice } from '@dariushstony/smart-storage';
 
-cacheVault.setItem('product-123', data, 5 * 60 * 1000);
-const product = cacheVault.getItem('product-123');
+// One slice, prefixed keys — simplest mental model.
+// Every write re-serializes the whole blob.
+const storage = getStorageSlice('MY_APP');
+storage.setItem('user:theme', 'dark');
+storage.setItem('cache:products', data, 5 * 60 * 1000);
 
-// ✅ After (Singleton)
-import { dkStorage } from '@dk/shared/utils/storage';
-
-dkStorage.setItem('cache:product-123', data, 5 * 60 * 1000);
-const product = dkStorage.getItem('cache:product-123');
+// Separate slices — isolates unrelated data, so a hot cache write
+// does not re-serialize your user preferences.
+const userPrefs = getStorageSlice('USER_PREFS');
+const cache = getStorageSlice('API_CACHE');
+userPrefs.setItem('theme', 'dark');
+cache.setItem('products', data, 5 * 60 * 1000);
 ```
 
-### Mixed Usage Example
-
-```typescript
-// ❌ Before (Multiple Vaults)
-import {
-  userPrefsVault,
-  cacheVault,
-  featureFlagsVault,
-  cartVault,
-} from '@dk/shared/utils/storage';
-
-userPrefsVault.setItem('theme', 'dark');
-cacheVault.setItem('products', data, 5 * 60 * 1000);
-featureFlagsVault.setItem('feature:new-ui', true);
-cartVault.setItem('items', items);
-
-// ✅ After (Singleton)
-import { dkStorage } from '@dk/shared/utils/storage';
-
-dkStorage.setItem('user:theme', 'dark');
-dkStorage.setItem('cache:products', data, 5 * 60 * 1000);
-dkStorage.setItem('feature:new-ui', true);
-dkStorage.setItem('cart:items', items);
-```
+**Split into slices when** data differs in update frequency, size, or lifetime
+(e.g. a `session` wizard vs. `local` preferences). **Keep one slice when** the
+data is small and related.
 
 ---
 
 ## Singleton Guarantee
 
+```text
+┌──────────────────────────────────────────────────────────┐
+│  File: user-component.tsx                                │
+│                                                          │
+│  const storage = getStorageSlice('MY_APP');              │
+│  storage.setItem('user:name', 'dariush');                │
+└──────────────────────────────────────────────────────────┘
+                           │
+                           │ Same instance
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│  File: profile-page.tsx                                  │
+│                                                          │
+│  const storage = getStorageSlice('MY_APP');              │
+│  const name = storage.getItem('user:name'); // 'dariush' │
+└──────────────────────────────────────────────────────────┘
+                           │
+                           │ Same instance
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│  File: header.tsx                                        │
+│                                                          │
+│  const storage = getStorageSlice('MY_APP');              │
+│  const name = storage.getItem('user:name'); // 'dariush' │
+└──────────────────────────────────────────────────────────┘
 ```
-┌─────────────────────────────────────────────────────┐
-│  File: user-component.tsx                           │
-│  import { dkStorage } from '@dk/shared/utils/storage'│
-│  dkStorage.setItem('user:name', 'dariush');         │
-└─────────────────────────────────────────────────────┘
-                       │
-                       │ Same Instance
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  File: product-component.tsx                        │
-│  import { dkStorage } from '@dk/shared/utils/storage'│
-│  const name = dkStorage.getItem('user:name');       │
-│  console.log(name); // → "dariush" ✅               │
-└─────────────────────────────────────────────────────┘
-                       │
-                       │ Same Instance
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  File: cart-service.ts                              │
-│  import { dkStorage } from '@dk/shared/utils/storage'│
-│  const name = dkStorage.getItem('user:name');       │
-│  console.log(name); // → "dariush" ✅               │
-└─────────────────────────────────────────────────────┘
 
-✅ All imports = Same instance
-✅ Data written in one place = Available everywhere
-✅ No prop drilling needed
-✅ No context provider needed
-```
+No module-level shared export is needed — the cache does the work.
 
 ---
 
-## In localStorage
-
-```
-Before (Multiple Vaults):
-┌──────────────────────┐
-│ localStorage         │
-├──────────────────────┤
-│ DK_USER_PREFS        │
-│ DK_API_CACHE         │
-│ DK_FEATURE_FLAGS     │
-│ DK_ANALYTICS         │
-│ DK_DRAFTS            │
-│ DK_GROWTHBOOK        │
-│ DK_CART              │
-│ DK_SESSION           │
-└──────────────────────┘
-❌ 8 separate keys
-
-After (Singleton):
-┌──────────────────────┐
-│ localStorage         │
-├──────────────────────┤
-│ DK_STORAGE           │
-│   {                  │
-│     "user:theme",    │
-│     "cache:prod-123",│
-│     "feature:new-ui",│
-│     "cart:items",    │
-│     ...              │
-│   }                  │
-└──────────────────────┘
-✅ 1 organized key
-```
-
----
-
-## Summary
-
-```
-┌─────────────────────────────────────────────┐
-│  ONE Import                                  │
-│  import { dkStorage } from '...';           │
-│                                             │
-│  ONE Vault                                   │
-│  dkStorage (singleton instance)             │
-│                                             │
-│  ONE Pattern                                 │
-│  Use key prefixes to organize               │
-│  (user:, cache:, feature:, etc.)            │
-│                                             │
-│  EVERYWHERE                                  │
-│  Works in all components, hooks, services   │
-└─────────────────────────────────────────────┘
-```
-
----
-
-## The Essence
+## Releasing Instances
 
 ```typescript
-// This is all you need to remember:
+import {
+  getStorageSlice,
+  disposeStorageSlice,
+  StorageVault,
+} from '@dariushstony/smart-storage';
 
-import { dkStorage } from '@dk/shared/utils/storage';
+const temp = getStorageSlice('TEMP', { storageType: 'session' });
 
-dkStorage.setItem('prefix:key', value);
-const data = dkStorage.getItem('prefix:key');
+// Flushes pending writes, removes listeners, drops it from the cache.
+// Pass the same storageType you created it with.
+disposeStorageSlice('TEMP', { storageType: 'session' });
 
-// That's it! 🎉
+// Or, in test teardown, drop every instance at once:
+StorageVault.clearAllInstances();
 ```
 
----
-
-**Simple. Clean. Powerful.** 🚀
+After disposal, the next `getStorageSlice('TEMP', …)` builds a fresh instance —
+and will re-read whatever is still persisted under that key.
