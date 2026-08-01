@@ -1,4 +1,4 @@
-# Contributing to @dariushstony/smart-storage
+# Contributing to @faravahar/smart-storage
 
 Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
 

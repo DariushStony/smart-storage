@@ -39,7 +39,7 @@ import type { StorageVaultOptions } from './vault/types.js';
  *
  * @example
  * // Using different storage types
- * import { StorageType } from '@dariushstony/smart-storage';
+ * import { StorageType } from '@faravahar/smart-storage';
  *
  * const persistent = getStorageSlice('USER_PREFS', { storageType: StorageType.Local });
  * const temporary = getStorageSlice('SESSION_DATA', { storageType: StorageType.Session });
@@ -47,7 +47,7 @@ import type { StorageVaultOptions } from './vault/types.js';
  *
  * @example
  * // With logging in the chain
- * import { LoggingHandler } from '@dariushstony/smart-storage';
+ * import { LoggingHandler } from '@faravahar/smart-storage';
  *
  * const vault = getStorageSlice('DATA', {
  *   transforms: [
@@ -58,7 +58,7 @@ import type { StorageVaultOptions } from './vault/types.js';
  *
  * @example
  * // With statistics
- * import { StorageStatistics } from '@dariushstony/smart-storage';
+ * import { StorageStatistics } from '@faravahar/smart-storage';
  *
  * const vault = getStorageSlice('DATA');
  * const stats = new StorageStatistics(

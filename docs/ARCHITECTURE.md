@@ -295,19 +295,16 @@ vault's accessors (`getStorageAdapter()`, `getStorageKey()`,
 
 ```typescript
 // Main API
-import {
-  getStorageSlice,
-  disposeStorageSlice,
-} from '@dariushstony/smart-storage';
+import { getStorageSlice, disposeStorageSlice } from '@faravahar/smart-storage';
 
 // Types
 import type {
   StorageTransform,
   StorageVaultOptions,
-} from '@dariushstony/smart-storage';
+} from '@faravahar/smart-storage';
 
 // Class (for direct instantiation — rare)
-import { StorageVault } from '@dariushstony/smart-storage';
+import { StorageVault } from '@faravahar/smart-storage';
 ```
 
 ## 🧪 Testing Strategy
