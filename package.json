@@ -90,7 +90,7 @@
     "vitest": "^4.1.10"
   },
   "lint-staged": {
-    "src/**/*.{ts,tsx}": [
+    "{src,tests}/**/*.{ts,tsx}": [
       "prettier --write",
       "oxlint --type-aware --fix"
     ],
