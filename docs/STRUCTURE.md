@@ -71,7 +71,7 @@ How the codebase is organized, and where to look for what.
 | `vault/storage-vault.ts`       | Main implementation                      |
 | `vault/types.ts`               | Type definitions                         |
 | `storage/storage.factory.ts`   | Chooses the backend (incl. SSR fallback) |
-| `transform/transform-chain.ts` | Transform pipeline                       |
+| `transform/transform-chain.ts` | Transform chain                          |
 
 ## Main Exports
 

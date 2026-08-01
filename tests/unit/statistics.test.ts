@@ -35,6 +35,10 @@ beforeEach(() => {
 afterEach(() => {
   StorageVault.clearAllInstances();
   vi.restoreAllMocks();
+  // Centralised so a failing assertion inside a fake-timer test cannot leak
+  // the frozen clock into later tests in this file, where the resulting
+  // failure would surface somewhere unrelated.
+  vi.useRealTimers();
 });
 
 describe('StorageStatistics.collect', () => {
@@ -142,7 +146,6 @@ describe('StorageStatistics.collect', () => {
     vault.cleanupExpiredItems();
 
     expect(attach(vault).collect(() => vault.getAllData()).itemCount).toBe(0);
-    vi.useRealTimers();
   });
 
   it('reflects a fresh reading on each call', () => {

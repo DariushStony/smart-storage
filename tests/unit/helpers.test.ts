@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   getByteSize,
@@ -65,9 +65,16 @@ describe('isExpired', () => {
   });
 
   it('is not expired exactly at the expiry instant', () => {
-    // The implementation uses a strict `now > expiry` comparison.
-    const now = Date.now();
-    expect(isExpired(now)).toBe(false);
+    // The implementation uses a strict `now > expiry` comparison. Pin the
+    // clock: without fake timers, isExpired() reads Date.now() a second time
+    // and a millisecond rollover between the two reads would flake the test.
+    vi.useFakeTimers();
+    try {
+      const now = Date.now();
+      expect(isExpired(now)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -23,10 +23,15 @@ jobs:
         with:
           node-version: 24
 
-      # Version intentionally omitted: resolved from the "packageManager"
-      # field in package.json so CI and local installs never drift.
-      # v6+ is required -- it is the first release supporting pnpm 11.
-      - uses: pnpm/action-setup@v6
+      # Pinned to a commit SHA, not a tag: this is a third-party action and the
+      # release job runs with id-token/contents write. Bump via Dependabot,
+      # which reads the trailing version comment.
+      #
+      # The pnpm version itself is deliberately NOT passed here -- it is
+      # resolved from the "packageManager" field in package.json so CI and
+      # local installs never drift. v6+ is required: it is the first release
+      # supporting pnpm 11.
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -55,7 +60,7 @@ jobs:
         with:
           node-version: 24
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -89,7 +94,7 @@ jobs:
         with:
           node-version: 24
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -137,10 +142,15 @@ jobs:
         with:
           node-version: 24
 
-      # Version intentionally omitted: resolved from the "packageManager"
-      # field in package.json so CI and local installs never drift.
-      # v6+ is required -- it is the first release supporting pnpm 11.
-      - uses: pnpm/action-setup@v6
+      # Pinned to a commit SHA, not a tag: this is a third-party action and the
+      # release job runs with id-token/contents write. Bump via Dependabot,
+      # which reads the trailing version comment.
+      #
+      # The pnpm version itself is deliberately NOT passed here -- it is
+      # resolved from the "packageManager" field in package.json so CI and
+      # local installs never drift. v6+ is required: it is the first release
+      # supporting pnpm 11.
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
@@ -188,10 +198,15 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      # Version intentionally omitted: resolved from the "packageManager"
-      # field in package.json so CI and local installs never drift.
-      # v6+ is required -- it is the first release supporting pnpm 11.
-      - uses: pnpm/action-setup@v6
+      # Pinned to a commit SHA, not a tag: this is a third-party action and the
+      # release job runs with id-token/contents write. Bump via Dependabot,
+      # which reads the trailing version comment.
+      #
+      # The pnpm version itself is deliberately NOT passed here -- it is
+      # resolved from the "packageManager" field in package.json so CI and
+      # local installs never drift. v6+ is required: it is the first release
+      # supporting pnpm 11.
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV

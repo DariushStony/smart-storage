@@ -622,11 +622,11 @@ These accessors exist mainly to wire up pluggable concerns such as
 
 ### Static Methods
 
-| Method                               | Returns        | Description                                |
-| ------------------------------------ | -------------- | ------------------------------------------ |
-| `StorageVault.getInstance(opts)`     | `StorageVault` | Gets/creates the singleton for the options |
-| `StorageVault.disposeInstance(opts)` | `boolean`      | Disposes a single instance                 |
-| `StorageVault.clearAllInstances()`   | `void`         | Flushes and removes all instances          |
+| Method                               | Returns        | Description                                                                                                  |
+| ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `StorageVault.getInstance(opts)`     | `StorageVault` | Gets/creates the singleton keyed on `storageType` + `storageKey`; other options apply only on first creation |
+| `StorageVault.disposeInstance(opts)` | `boolean`      | Disposes a single instance; matched on `storageType` + `storageKey`                                          |
+| `StorageVault.clearAllInstances()`   | `void`         | Flushes and removes all instances                                                                            |
 
 ---
 

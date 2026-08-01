@@ -29,7 +29,7 @@ Closes #
 
 <!-- Paste the `pnpm size:check` output if this affects the bundle. -->
 
-```
+```text
 Size limit: 5 kB
 Size:
 ```

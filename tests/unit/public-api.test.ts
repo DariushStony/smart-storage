@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import * as api from '../../src/index.js';
 import {
-  disposeStorageSlice,
-  getStorageSlice,
   InlineTransformHandler,
   LoggingHandler,
   StorageStatistics,
@@ -11,6 +9,8 @@ import {
   StorageVault,
   TransformChain,
   TransformHandler,
+  disposeStorageSlice,
+  getStorageSlice,
 } from '../../src/index.js';
 
 beforeEach(() => {
