@@ -685,6 +685,58 @@ describe('quota handling', () => {
 
     expect(() => vault.setItem('k', 'v')).toThrow(/failed to save to storage/i);
   });
+
+  it('surfaces the error when the post-cleanup retry also fails', () => {
+    const vault = makeVault();
+    // Every write fails, so cleanup frees nothing and the retry fails too.
+    vi.spyOn(vault.getStorageAdapter(), 'write').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+
+    expect(() => vault.setItem('k', 'v')).toThrow(/quota exceeded/i);
+  });
+
+  // KNOWN DEFECT -- marked `fails` so it documents the behaviour we want
+  // without pinning CI red. When the vault is fixed this test starts passing,
+  // `it.fails` then reports it as failing, and whoever fixes it must delete
+  // this marker. Do not "fix" it by weakening the assertions.
+  //
+  // Today, when a write exceeds the quota and there is nothing expired to
+  // reclaim, handleSaveError retries by re-reading getAllData() from storage --
+  // which is the last successfully persisted state, i.e. WITHOUT the new item.
+  // That smaller payload fits, so the retry succeeds, the DOMException is
+  // swallowed, and setItem returns true having silently discarded the caller's
+  // data. Verified against real Chromium too: 20 x 512 KB writes all returned
+  // true while only 9 keys survived.
+  it.fails(
+    'KNOWN DEFECT: setItem reports success while silently dropping data at quota',
+    () => {
+      const vault = makeVault();
+      const adapter = vault.getStorageAdapter();
+      const realWrite = adapter.write.bind(adapter);
+      const CEILING = 5000;
+
+      // Mimic a full origin: large payloads are refused, smaller ones fit.
+      vi.spyOn(adapter, 'write').mockImplementation(
+        (key: string, value: string) => {
+          if (value.length > CEILING) {
+            throw new DOMException('full', 'QuotaExceededError');
+          }
+          realWrite(key, value);
+        }
+      );
+
+      const accepted: string[] = [];
+      for (let i = 0; i < 8; i += 1) {
+        const key = `chunk-${String(i)}`;
+        // A `true` return must mean the value is retrievable afterwards.
+        if (vault.setItem(key, 'x'.repeat(1000))) accepted.push(key);
+      }
+
+      // Currently fails: 8 keys are "accepted" but only ~4 persist.
+      expect(vault.getAllKeys().sort()).toEqual(accepted.sort());
+    }
+  );
 });
 
 describe('in-memory item cap', () => {
