@@ -1,3 +1,11 @@
+## [1.0.2](https://github.com/DariushStony/smart-storage/compare/v1.0.1...v1.0.2) (2026-08-01)
+
+### Bug Fixes
+
+- address CodeRabbit review comments ([7e4f333](https://github.com/DariushStony/smart-storage/commit/7e4f33335b7eb8d4d427c8b85ffe440a4a398944))
+- scope security overrides, stop excluding the public API from coverage ([1edb1e0](https://github.com/DariushStony/smart-storage/commit/1edb1e0ff86adaddcc67303c202ea62629587f8c))
+- **test:** assert the large-payload invariant instead of demanding a quota breach ([fdd6b9f](https://github.com/DariushStony/smart-storage/commit/fdd6b9fab5ad7e4241fabfa407cba0ed900a55b2))
+
 ## [1.0.1](https://github.com/DariushStony/smart-storage/compare/v1.0.0...v1.0.1) (2026-02-07)
 
 ### Bug Fixes
