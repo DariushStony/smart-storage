@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Least-privilege default for every job. The release job widens this for
+# itself; nothing else needs more than reading the checkout.
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Code Quality
@@ -39,10 +44,91 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
 
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v6
+
+      - name: Get pnpm store path
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v6
+
+      - name: Get pnpm store path
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cache the browser binaries separately -- they are large and change
+      # only when the Playwright version does.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # pretest:e2e builds the bundle the harness page imports.
+      - run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality, test]
 
     steps:
       - uses: actions/checkout@v7
@@ -79,7 +165,10 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [quality, build]
+    # A release publishes to npm, so every gate must pass first -- including
+    # the e2e suite, which is the only check that exercises the built bundle
+    # in a real browser.
+    needs: [quality, test, e2e, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:

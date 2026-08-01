@@ -1,0 +1,14 @@
+{
+  // Typechecks the test suites. The base tsconfig emits the published build
+  // from src/ only, so tests are checked separately with emit disabled.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"],
+    "rootDir": "."
+  },
+  "include": ["tests", "vitest.config.ts", "playwright.config.ts"]
+}

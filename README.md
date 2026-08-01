@@ -746,6 +746,8 @@ This is infrastructure code, not a toy utility.
 ## 📚 Additional Documentation
 
 - [Documentation index](docs/README.md) — start here
+- [Security Policy](SECURITY.md) — reporting vulnerabilities, and what is out of scope
+- [Code of Conduct](CODE_OF_CONDUCT.md) — community expectations
 - [Architecture](docs/ARCHITECTURE.md) — system design and technical decisions
 - [Storage Architecture](docs/STORAGE_ARCHITECTURE.md) — deep dive into storage mechanisms
 - [How to Use](docs/HOW_TO_USE_STORAGE.md) — simple examples and patterns
@@ -754,15 +756,36 @@ This is infrastructure code, not a toy utility.
 - [Examples](examples/README.md) — runnable sample apps
 - [Contributing](CONTRIBUTING.md) — dev setup and workflow
 
+## 🧪 Tests
+
+```bash
+pnpm test           # Unit tests (Vitest + happy-dom)
+pnpm test:coverage  # With a coverage report
+pnpm test:e2e       # E2E against real Chromium (builds first)
+pnpm test:all       # Both
+```
+
+Unit tests cover the logic — TTL, transforms, singleton identity, key
+validation, debounce coalescing. The Playwright suite covers what a simulated
+DOM cannot honestly prove: persistence across real page reloads,
+`sessionStorage` clearing with the tab, genuine `pagehide` flushing, real quota
+pressure, and cross-tab visibility. E2E specs load `dist/`, so they exercise the
+artifact that actually ships.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#-testing) for which layer to use.
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for dev
+setup, commit conventions, and the testing guide.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## 📝 License
 

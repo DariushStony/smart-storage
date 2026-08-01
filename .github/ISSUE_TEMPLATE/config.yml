@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/DariushStony/smart-storage/security/advisories/new
+    about: Please report vulnerabilities privately, never as a public issue.
+  - name: 📖 Documentation
+    url: https://github.com/DariushStony/smart-storage#readme
+    about: Check the README and docs/ before filing — the API reference covers most questions.
+  - name: 💬 Questions and ideas
+    url: https://github.com/DariushStony/smart-storage/discussions
+    about: For usage questions and open-ended ideas, start a discussion instead.

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>smart-storage e2e harness</title>
+  </head>
+  <body>
+    <h1>smart-storage e2e harness</h1>
+    <p>
+      This page loads the built ESM bundle and exposes it on
+      <code>window.smartStorage</code> so Playwright specs can drive the real
+      library against real Web Storage.
+    </p>
+
+    <script type="module">
+      // Imports the actual published entry point, so these specs verify the
+      // shipped artifact rather than the TypeScript sources.
+      import * as smartStorage from '/dist/index.js';
+
+      window.smartStorage = smartStorage;
+      window.__smartStorageReady = true;
+    </script>
+  </body>
+</html>

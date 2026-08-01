@@ -1,5 +1,37 @@
 # esbuild's postinstall fetches its platform-native binary; tsup needs it to build.
 allowBuilds:
   esbuild: true
+
 minimumReleaseAgeExclude:
   - lint-staged@17.3.0
+
+# Forced patched versions for transitive advisories.
+#
+# Every entry here is a devDependency reached through semantic-release,
+# commitlint, tsup or size-limit. The published package has zero runtime
+# dependencies and ships only dist/, so none of these ever reach consumers --
+# they are pinned to keep the development and release environment clean.
+#
+# Each pin is the lowest patched version inside the major its parent expects,
+# to avoid dragging in an incompatible major. Re-check with `pnpm audit` and
+# prune entries once the parent tools ship updated dependencies.
+overrides:
+  # GHSA: AST type confusion / prototype pollution -> patched 4.7.9
+  handlebars: ^4.7.9
+  # GHSA: code injection via _.template, prototype pollution in _.unset/_.omit
+  lodash-es: ^4.17.24
+  # GHSA: WebSocket length overflow, request smuggling, Set-Cookie injection
+  undici: ^6.27.0
+  # GHSA: arbitrary file write via path traversal
+  rollup: ^4.59.0
+  # GHSA: method injection in POSIX character classes (both majors affected)
+  picomatch@<2.3.2: ^2.3.2
+  picomatch@>=4.0.0 <4.0.4: ^4.0.4
+  # GHSA: prototype pollution
+  ajv: ^8.18.0
+  # GHSA: path traversal + host confusion via percent-encoded authority
+  fast-uri: ^3.1.4
+  # GHSA: quadratic CPU via YAML merge-key chains
+  js-yaml: ^4.3.0
+  # GHSA: arbitrary file read via dev server on Windows
+  esbuild: ^0.28.1
