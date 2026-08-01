@@ -2,7 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/@dariushstony%2Fsmart-storage.svg)](https://www.npmjs.com/package/@dariushstony/smart-storage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg)](https://www.typescriptlang.org/)
 
 A **robust, SSR-safe, and production-ready wrapper** around Web Storage (`localStorage` / `sessionStorage` / `in-memory`) with:
 
@@ -81,24 +81,35 @@ Treat **all stored data as potentially compromised** and validate on read.
 ## 📤 Exports
 
 ```typescript
-// Main exports
+// Value exports
 import {
   getStorageSlice, // Create custom storage slices
   disposeStorageSlice, // Clean up temporary slices
   StorageVault, // Class for advanced usage
+  StorageType, // Const object: { Local, Session, InMemory }
+  LoggingHandler, // Opt-in logging, added to the transform chain
+  TransformHandler, // Base class for custom transforms
+  InlineTransformHandler, // Wraps a plain { serialize, deserialize } object
+  TransformChain, // Pre-built chain of transform handlers
+  StorageStatistics, // Opt-in stats collection
 } from '@dariushstony/smart-storage';
 
 // Type exports
 import type {
   StorageLogger,
-  StorageType, // 'local' | 'session' | 'in-memory'
+  StorageTypeValue, // 'local' | 'session' | 'in-memory'
   StorageVaultOptions,
   StorageStats,
   StorageTransform,
   StoredData,
   DataRecord,
+  IStorage,
 } from '@dariushstony/smart-storage';
 ```
+
+> **Note:** `StorageType` is a runtime value (a `const` object), so import it
+> normally — not with `import type`. The corresponding union type is
+> `StorageTypeValue`.
 
 ---
 
@@ -374,11 +385,26 @@ Uses `JSON.stringify()` internally.
 
 ## 📊 Stats & Debugging
 
+Statistics are a **pluggable concern** — they are not built into the vault, so
+you pay nothing if you don't use them. Construct a `StorageStatistics` from the
+vault's accessors and call `collect()`:
+
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import {
+  getStorageSlice,
+  StorageStatistics,
+} from '@dariushstony/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
-const stats = storage.getStats();
+
+const statistics = new StorageStatistics(
+  storage.getStorageAdapter(),
+  storage.getStorageKey(),
+  storage.getTransformChain(),
+  storage.getMaxSizeBytes()
+);
+
+const stats = statistics.collect(() => storage.getAllData());
 console.log(stats);
 ```
 
@@ -398,8 +424,7 @@ console.log(stats);
 ### Example usage
 
 ```typescript
-const storage = getStorageSlice('MY_APP');
-const stats = storage.getStats();
+const stats = statistics.collect(() => storage.getAllData());
 console.log(`Using ${stats.itemCount} items`);
 console.log(`Size: ${(stats.sizeBytes / 1024).toFixed(2)} KB`);
 console.log(`Quota: ${stats.quotaPercentage.toFixed(1)}%`);
@@ -447,13 +472,18 @@ disposeStorageSlice('TEMP_SESSION', {
 });
 ```
 
-**Important:** The options passed to `disposeStorageSlice` must match exactly with those used in `getStorageSlice`.
+**Important:** Instances are cached by `storageType` + slice key, so
+`disposeStorageSlice` must be given the same `storageType` used to create the
+slice. Other options (`debounceMs`, `transforms`, …) do not affect lookup.
 
 ---
 
 ## 🧪 Testing Utilities
 
 ### Clear all instances
+
+Flushes pending writes, cleans up listeners, and removes every vault instance
+from the singleton cache.
 
 ```typescript
 import { StorageVault } from '@dariushstony/smart-storage';
@@ -486,16 +516,16 @@ describe('My tests', () => {
 });
 ```
 
-Flushes, cleans up, and removes all vault instances.
-
 ---
 
 ## 🧱 Error Handling & Logging
 
-Inject your own logger (e.g., Sentry):
+Logging is a **pluggable concern**, not a constructor option. Add a
+`LoggingHandler` to the transform chain to enable it — remove it to disable
+logging entirely, with zero overhead.
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
 import type { StorageLogger } from '@dariushstony/smart-storage';
 
 const customLogger: StorageLogger = {
@@ -508,7 +538,7 @@ const customLogger: StorageLogger = {
 
 const vault = getStorageSlice('APP_DATA', {
   storageType: 'local',
-  logger: customLogger,
+  transforms: [new LoggingHandler(customLogger)],
 });
 ```
 
@@ -522,20 +552,28 @@ const customStorage = getStorageSlice('CUSTOM', {
   debounceMs: 200, // Custom debounce delay
   maxSizeBytes: 10_000_000, // 10MB quota warning threshold
   maxItemsInMemory: 2000, // Max items for in-memory fallback
-  logger: customLogger, // Custom logger integration
+  transforms: [new LoggingHandler(customLogger)], // Opt-in logging
 });
 ```
 
 ### Configuration Options
 
-| Option             | Type                                  | Default      | Description                            |
-| ------------------ | ------------------------------------- | ------------ | -------------------------------------- |
-| `storageType`      | `'local' \| 'session' \| 'in-memory'` | `'local'`    | Storage backend to use                 |
-| `storageKey`       | `string`                              | `'APP_DATA'` | Key under which to store data          |
-| `debounceMs`       | `number`                              | `100`        | Write debouncing delay (0 = immediate) |
-| `maxSizeBytes`     | `number`                              | `4_000_000`  | Quota warning threshold (~4MB)         |
-| `maxItemsInMemory` | `number`                              | `1000`       | Max items for in-memory storage        |
-| `logger`           | `StorageLogger`                       | `undefined`  | Custom error logger                    |
+| Option             | Type                                       | Default     | Description                                         |
+| ------------------ | ------------------------------------------ | ----------- | --------------------------------------------------- |
+| `storageType`      | `'local' \| 'session' \| 'in-memory'`      | `'local'`   | Storage backend to use                              |
+| `debounceMs`       | `number`                                   | `100`       | Write debouncing delay (0 = immediate)              |
+| `maxSizeBytes`     | `number`                                   | `4_000_000` | Quota warning threshold (~4MB)                      |
+| `maxItemsInMemory` | `number`                                   | `1000`      | Max items for in-memory storage                     |
+| `transforms`       | `(TransformHandler \| StorageTransform)[]` | `undefined` | Handlers/objects wrapped into a chain               |
+| `transformChain`   | `TransformChain`                           | `undefined` | Pre-built chain; takes precedence over `transforms` |
+
+> `storageKey` is also part of `StorageVaultOptions`, but `getStorageSlice()`
+> sets it from its own `sliceKey` argument, so you cannot pass it directly.
+> Its default when using `StorageVault` directly is `'APP_DATA'`.
+>
+> Logging and statistics are deliberately **not** options here — see
+> [Error Handling & Logging](#-error-handling--logging) and
+> [Stats & Debugging](#-stats--debugging).
 
 ---
 
@@ -568,7 +606,27 @@ const customStorage = getStorageSlice('CUSTOM', {
 | `cleanupExpiredItems()` | `number` | Removes expired items, returns count |
 | `flush()`               | `void`   | Flushes pending debounced writes     |
 | `getCurrentSize()`      | `number` | Returns storage size in bytes        |
-| `getStats()`            | `object` | Returns detailed storage statistics  |
+
+### Introspection
+
+These accessors exist mainly to wire up pluggable concerns such as
+[`StorageStatistics`](#-stats--debugging).
+
+| Method                | Returns          | Description                            |
+| --------------------- | ---------------- | -------------------------------------- |
+| `getAllData()`        | `DataRecord`     | Raw records, including expiry metadata |
+| `getStorageAdapter()` | `IStorage`       | The underlying storage adapter         |
+| `getStorageKey()`     | `string`         | The key this slice is stored under     |
+| `getTransformChain()` | `TransformChain` | The active transform chain             |
+| `getMaxSizeBytes()`   | `number`         | The configured quota warning threshold |
+
+### Static Methods
+
+| Method                               | Returns        | Description                                |
+| ------------------------------------ | -------------- | ------------------------------------------ |
+| `StorageVault.getInstance(opts)`     | `StorageVault` | Gets/creates the singleton for the options |
+| `StorageVault.disposeInstance(opts)` | `boolean`      | Disposes a single instance                 |
+| `StorageVault.clearAllInstances()`   | `void`         | Flushes and removes all instances          |
 
 ---
 
@@ -591,36 +649,10 @@ const vault = getStorageSlice('LARGE_DATA', {
 });
 
 // Data is automatically compressed before storage and decompressed on read
-vault.setItem('bigObject', {
-  /* large data */
-});
+vault.setItem('bigObject', {/* large data */});
 ```
 
 Transforms are applied in order during writes and reversed during reads.
-
----
-
-## 🔌 Setup with Custom Logger
-
-If you want to integrate with your logging service (Sentry, LogRocket, etc.):
-
-```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
-import type { StorageLogger } from '@dariushstony/smart-storage';
-
-const customLogger: StorageLogger = {
-  log: (message, error) => {
-    console.error('[Storage]', message, error);
-    // Send to your logging service
-    // Sentry.captureException(error, { extra: { message } });
-  },
-};
-
-const vault = getStorageSlice('APP_DATA', {
-  storageType: 'local',
-  logger: customLogger,
-});
-```
 
 ---
 
@@ -713,10 +745,14 @@ This is infrastructure code, not a toy utility.
 
 ## 📚 Additional Documentation
 
-- **Architecture**: `docs/ARCHITECTURE.md` - System design and technical decisions
-- **Storage Architecture**: `docs/STORAGE_ARCHITECTURE.md` - Deep dive into storage mechanisms
-- **How to Use**: `docs/HOW_TO_USE_STORAGE.md` - Simple examples and patterns
-- **Project Structure**: `docs/STRUCTURE.md` - Codebase organization
+- [Documentation index](docs/README.md) — start here
+- [Architecture](docs/ARCHITECTURE.md) — system design and technical decisions
+- [Storage Architecture](docs/STORAGE_ARCHITECTURE.md) — deep dive into storage mechanisms
+- [How to Use](docs/HOW_TO_USE_STORAGE.md) — simple examples and patterns
+- [Singleton Pattern](docs/SINGLETON_PATTERN_VISUAL.md) — how instances are cached per slice
+- [Project Structure](docs/STRUCTURE.md) — codebase organization
+- [Examples](examples/README.md) — runnable sample apps
+- [Contributing](CONTRIBUTING.md) — dev setup and workflow
 
 ## 🤝 Contributing
 

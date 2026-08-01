@@ -1,9 +1,9 @@
-import { InMemoryStorage } from './in-memory-storage';
-import { LocalStorage } from './local-storage';
-import { SessionStorage } from './session-storage';
-import type { IStorage } from './storage.interface';
-import { StorageType } from './storage-type';
-import type { StorageTypeValue } from './storage-type';
+import { InMemoryStorage } from './in-memory-storage.js';
+import { LocalStorage } from './local-storage.js';
+import { SessionStorage } from './session-storage.js';
+import type { IStorage } from './storage.interface.js';
+import { StorageType } from './storage-type.js';
+import type { StorageTypeValue } from './storage-type.js';
 
 /**
  * Factory for creating storage instances based on the storage type.

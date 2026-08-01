@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# This project uses pnpm exclusively; other lockfiles must not be committed
+package-lock.json
+yarn.lock
+
 # Build output
 dist/
 

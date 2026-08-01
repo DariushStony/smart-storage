@@ -1,0 +1,5 @@
+# esbuild's postinstall fetches its platform-native binary; tsup needs it to build.
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - lint-staged@17.3.0

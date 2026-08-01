@@ -1,4 +1,4 @@
-import type { IStorage } from './storage.interface';
+import type { IStorage } from './storage.interface.js';
 
 /**
  * Storage adapter using an in-memory Map.
@@ -29,10 +29,7 @@ class InMemoryStorage implements IStorage {
   }
 
   getStorageType():
-    | 'localStorage'
-    | 'sessionStorage'
-    | 'memory'
-    | 'unavailable' {
+    'localStorage' | 'sessionStorage' | 'memory' | 'unavailable' {
     return 'memory';
   }
 

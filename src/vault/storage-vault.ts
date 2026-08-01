@@ -1,13 +1,13 @@
-import type { IStorage } from '../storage/storage.interface';
-import { createStorage } from '../storage/storage.factory';
-import { DEFAULT_STORAGE_TYPE } from '../storage/storage-type';
-import { TransformChain } from '../transform/transform-chain';
+import type { IStorage } from '../storage/storage.interface.js';
+import { createStorage } from '../storage/storage.factory.js';
+import { DEFAULT_STORAGE_TYPE } from '../storage/storage-type.js';
+import { TransformChain } from '../transform/transform-chain.js';
 import {
   DEFAULT_DEBOUNCE_MS,
   DEFAULT_MAX_ITEMS_IN_MEMORY,
   DEFAULT_MAX_SIZE_BYTES,
   DEFAULT_STORAGE_KEY,
-} from './constants';
+} from './constants.js';
 import {
   getByteSize,
   isCircularReferenceError,
@@ -15,8 +15,8 @@ import {
   isQuotaExceededError,
   isValidDataRecord,
   validateKey,
-} from './helpers';
-import type { DataRecord, StorageVaultOptions, StoredData } from './types';
+} from './helpers.js';
+import type { DataRecord, StorageVaultOptions, StoredData } from './types.js';
 
 /**
  * StorageVault - A unified wrapper around Web Storage with TTL, transforms, and safe handling.

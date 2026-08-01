@@ -60,7 +60,7 @@ docs/
 
 Want to contribute? Check out:
 
-1. [Contributing Guidelines](../README.md#-contributing)
+1. [Contributing Guidelines](../CONTRIBUTING.md)
 2. [Architecture Documentation](./ARCHITECTURE.md) - Understand the codebase structure
 3. [Project Structure](./STRUCTURE.md) - Navigate the code organization
 

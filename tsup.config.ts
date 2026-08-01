@@ -9,8 +9,10 @@ export default defineConfig({
   // Output formats - ESM and CommonJS
   format: ['esm', 'cjs'],
 
-  // Generate TypeScript declarations
-  dts: true,
+  // Declarations are emitted by tsc, not tsup: tsup's dts step uses
+  // rollup-plugin-dts, which crashes on the TypeScript 7 compiler API.
+  // See the "build" script -- tsc --emitDeclarationOnly runs after tsup.
+  dts: false,
 
   // Generate sourcemaps
   sourcemap: true,

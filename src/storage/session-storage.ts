@@ -1,5 +1,5 @@
-import { isWindowAvailable } from './environment';
-import type { IStorage } from './storage.interface';
+import { isWindowAvailable } from './environment.js';
+import type { IStorage } from './storage.interface.js';
 
 /**
  * Storage adapter using the browser's sessionStorage API.
@@ -61,10 +61,7 @@ class SessionStorage implements IStorage {
   }
 
   getStorageType():
-    | 'localStorage'
-    | 'sessionStorage'
-    | 'memory'
-    | 'unavailable' {
+    'localStorage' | 'sessionStorage' | 'memory' | 'unavailable' {
     if (!this.storage) return 'unavailable';
     if (this.storage instanceof Map) return 'memory';
     return 'sessionStorage';

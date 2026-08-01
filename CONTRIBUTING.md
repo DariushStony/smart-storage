@@ -6,8 +6,19 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- pnpm 8 or higher (recommended)
+- Node.js 24 or higher (required by the current dev toolchain)
+- pnpm 11.18.0
+
+The pnpm version is pinned in the `packageManager` field of `package.json`. With
+[Corepack](https://nodejs.org/api/corepack.html) enabled, the correct version is
+selected automatically:
+
+```bash
+corepack enable
+```
+
+> **Note:** These are requirements for _developing_ the package. The published
+> library itself has no such constraint — see the README for runtime support.
 
 ### Setup
 
@@ -51,7 +62,7 @@ pnpm clean          # Clean build output
 pnpm typecheck      # Type check with TypeScript
 
 # Code Quality
-pnpm lint           # Lint the code
+pnpm lint           # Lint with oxlint (type-aware)
 pnpm lint:fix       # Lint and auto-fix issues
 pnpm format         # Format code with Prettier
 pnpm format:check   # Check code formatting
@@ -164,10 +175,14 @@ function getItem(key: any): any {
 2. External dependencies
 3. Internal dependencies
 
+Relative imports **must** carry an explicit `.js` extension, even though the
+source files are `.ts`. Declarations are emitted by `tsc`, and extensionless
+specifiers break consumers using `node16`/`nodenext` module resolution.
+
 ```typescript
-import type { StorageType, StorageLogger } from './types';
-import { DEFAULT_DEBOUNCE_MS } from './constants';
-import { validateKey, isExpired } from './helpers';
+import type { StorageTypeValue, StorageLogger } from './types.js';
+import { DEFAULT_DEBOUNCE_MS } from './constants.js';
+import { validateKey, isExpired } from './helpers.js';
 ```
 
 ## 🧪 Testing
@@ -245,8 +260,8 @@ What actually happens
 **Environment:**
 
 - Browser: Chrome 120
-- Node.js: v20.10.0
-- Package version: 0.1.0
+- Node.js: v24.11.0
+- Package version: 1.0.1
 
 **Code Sample:**
 \`\`\`typescript
@@ -282,25 +297,40 @@ All submissions require review. We use GitHub Pull Requests for this:
 
 ## 🎯 Project Structure
 
-```
+```text
 src/
-├── core/              # Core implementation
-│   ├── vault.ts       # Main StorageVault class
-│   └── storage-backend.ts
-├── transforms/        # Transform pipeline
-│   └── pipeline.ts
-├── utils/             # Utilities
-│   ├── types.ts       # Type definitions
-│   ├── constants.ts   # Configuration
-│   └── helpers.ts     # Helper functions
-└── index.ts           # Public API
+├── vault/                      # Core implementation
+│   ├── storage-vault.ts        # Main StorageVault class
+│   ├── helpers.ts              # Validation and expiry helpers
+│   ├── constants.ts            # Defaults and dangerous-key list
+│   └── types.ts                # StorageVaultOptions, StorageStats, ...
+├── storage/                    # Storage backends
+│   ├── storage.interface.ts    # IStorage contract
+│   ├── storage.factory.ts      # Backend selection
+│   ├── storage-type.ts         # StorageType constants
+│   ├── local-storage.ts        # localStorage adapter
+│   ├── session-storage.ts      # sessionStorage adapter
+│   ├── in-memory-storage.ts    # Map adapter (SSR/testing)
+│   └── environment.ts          # SSR detection
+├── transform/                  # Transform chain
+│   ├── transform-chain.ts      # Chain of Responsibility
+│   ├── transform-handler.ts    # Base handler class
+│   ├── inline-transform-handler.ts
+│   └── types.ts                # StorageTransform
+├── logger/                     # Pluggable logging
+│   ├── storage-logger.ts       # StorageLogger interface
+│   └── logging-handler.ts      # Logging as a chain handler
+├── statistics/                 # Pluggable statistics
+│   └── storage-statistics.ts   # StorageStatistics
+└── index.ts                    # Public API
 ```
+
+Each folder has an `index.ts` barrel file re-exporting its public pieces.
 
 ## 🤝 Community
 
 - Be respectful and constructive
 - Help others when you can
-- Follow the [Code of Conduct](./CODE_OF_CONDUCT.md)
 
 ## 📜 License
 

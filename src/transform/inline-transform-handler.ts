@@ -1,5 +1,5 @@
-import { TransformHandler } from './transform-handler';
-import type { StorageTransform } from './types';
+import { TransformHandler } from './transform-handler.js';
+import type { StorageTransform } from './types.js';
 
 /**
  * A concrete TransformHandler that wraps a plain StorageTransform object.

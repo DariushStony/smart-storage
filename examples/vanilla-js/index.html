@@ -219,6 +219,15 @@ Check the browser console (F12) for detailed logs.
 
         // Mock implementation for demo purposes
         // In real usage: import { getStorageSlice } from '@dariushstony/smart-storage';
+        //
+        // Caveat: this mock exposes a convenience getStats() so the demo can
+        // render the counters below. The real library has no such method --
+        // statistics are a pluggable concern via StorageStatistics:
+        //   const statistics = new StorageStatistics(
+        //     vault.getStorageAdapter(), vault.getStorageKey(),
+        //     vault.getTransformChain(), vault.getMaxSizeBytes(),
+        //   );
+        //   statistics.collect(() => vault.getAllData());
 
         function log(message) {
             const output = document.getElementById('output');
