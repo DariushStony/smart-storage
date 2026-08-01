@@ -1,11 +1,13 @@
-import { TransformPipeline } from '../transforms/pipeline';
+import type { IStorage } from '../storage/storage.interface';
+import { createStorage } from '../storage/storage.factory';
+import { DEFAULT_STORAGE_TYPE } from '../storage/storage-type';
+import { TransformChain } from '../transform/transform-chain';
 import {
   DEFAULT_DEBOUNCE_MS,
   DEFAULT_MAX_ITEMS_IN_MEMORY,
   DEFAULT_MAX_SIZE_BYTES,
   DEFAULT_STORAGE_KEY,
-  DEFAULT_STORAGE_TYPE,
-} from '../utils/constants';
+} from './constants';
 import {
   getByteSize,
   isCircularReferenceError,
@@ -13,28 +15,32 @@ import {
   isQuotaExceededError,
   isValidDataRecord,
   validateKey,
-} from '../utils/helpers';
+} from './helpers';
 import type {
   DataRecord,
-  StorageLogger,
-  StorageStats,
   StorageVaultOptions,
   StoredData,
-} from '../utils/types';
-import { StorageBackend } from './storage-backend';
+} from './types';
 
 /**
  * StorageVault - A unified wrapper around Web Storage with TTL, transforms, and safe handling.
+ *
+ * Logging and statistics are **detachable concerns**, not baked into the vault:
+ *
+ * - **Logging**: Add a `LoggingHandler` to the transform chain to observe data flowing through.
+ *   Remove it from the array to disable logging — zero code changes, zero overhead.
+ *
+ * - **Statistics**: Use `StorageStatistics` externally to collect metrics on demand.
+ *   Don't create one if you don't need stats — zero overhead.
  *
  * @see README.md for comprehensive documentation
  */
 class StorageVault {
   private static instances = new Map<string, StorageVault>();
 
-  private backend: StorageBackend;
-  private transformPipeline: TransformPipeline;
+  private storage: IStorage;
+  private transformChain: TransformChain;
   private storageKey: string;
-  private logger?: StorageLogger;
   private maxSizeBytes: number;
   private maxItemsInMemory: number;
   private debounceMs: number;
@@ -49,10 +55,10 @@ class StorageVault {
     const {
       storageType = DEFAULT_STORAGE_TYPE,
       storageKey = DEFAULT_STORAGE_KEY,
-      logger,
       maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
       maxItemsInMemory = DEFAULT_MAX_ITEMS_IN_MEMORY,
       debounceMs = DEFAULT_DEBOUNCE_MS,
+      transformChain,
       transforms = [],
     } = options;
 
@@ -64,10 +70,10 @@ class StorageVault {
         new StorageVault({
           storageType,
           storageKey,
-          logger,
           maxSizeBytes,
           maxItemsInMemory,
           debounceMs,
+          transformChain,
           transforms,
         })
       );
@@ -75,9 +81,6 @@ class StorageVault {
 
     const instance = StorageVault.instances.get(key);
     if (!instance) {
-      logger?.log('Failed to create or retrieve StorageVault instance', {
-        key,
-      });
       throw new Error(
         `Failed to create or retrieve StorageVault instance: ${key}`
       );
@@ -124,23 +127,22 @@ class StorageVault {
     const {
       storageType = DEFAULT_STORAGE_TYPE,
       storageKey = DEFAULT_STORAGE_KEY,
-      logger,
       maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
       maxItemsInMemory = DEFAULT_MAX_ITEMS_IN_MEMORY,
       debounceMs = DEFAULT_DEBOUNCE_MS,
+      transformChain,
       transforms = [],
     } = options;
 
-    this.logger = logger;
     this.storageKey = storageKey;
     this.maxSizeBytes = maxSizeBytes;
     this.maxItemsInMemory = maxItemsInMemory;
     this.debounceMs = debounceMs;
-    this.backend = new StorageBackend(storageType, logger);
-    this.transformPipeline = new TransformPipeline(transforms, logger);
+    this.storage = createStorage(storageType);
+    this.transformChain = transformChain ?? TransformChain.from(transforms);
 
     // Setup pagehide handler to flush pending writes
-    this.backend.registerUnloadHandler(() => {
+    this.storage.registerUnloadHandler(() => {
       if (this.dirtyData) {
         this.saveAllDataImmediate(this.dirtyData);
         this.dirtyData = null;
@@ -148,25 +150,59 @@ class StorageVault {
     });
   }
 
+  // ==================== INTERNAL ACCESSORS ====================
+  // Exposed for StorageStatistics and other detachable concerns.
+
+  /**
+   * Returns the underlying storage adapter.
+   * Used by detachable concerns like StorageStatistics.
+   */
+  getStorageAdapter(): IStorage {
+    return this.storage;
+  }
+
+  /**
+   * Returns the transform chain.
+   * Used by detachable concerns like StorageStatistics.
+   */
+  getTransformChain(): TransformChain {
+    return this.transformChain;
+  }
+
+  /**
+   * Returns the storage key used by this vault instance.
+   */
+  getStorageKey(): string {
+    return this.storageKey;
+  }
+
+  /**
+   * Returns the configured max size in bytes.
+   */
+  getMaxSizeBytes(): number {
+    return this.maxSizeBytes;
+  }
+
+  // ==================== PRIVATE HELPERS ====================
+
   /**
    * Reads and deserializes all data from storage.
    */
-  private getAllData(): DataRecord {
-    const storage = this.backend.getStorage();
-    if (!storage) return {};
+  getAllData(): DataRecord {
+    const raw = this.storage.getStorage();
+    if (!raw) return {};
 
     // Return dirty data if we have pending writes (read-after-write consistency)
-    // Return a shallow copy to allow multiple setItem calls before debounced write
     if (this.dirtyData !== null) {
       return { ...(this.dirtyData ?? {}) };
     }
 
     try {
-      const dataStr = this.backend.read(this.storageKey);
+      const dataStr = this.storage.read(this.storageKey);
       if (!dataStr) return {};
 
       // Apply reverse transforms before JSON parsing
-      const deserializedStr = this.transformPipeline.reverse(dataStr);
+      const deserializedStr = this.transformChain.reverse(dataStr);
       const parsed = JSON.parse(deserializedStr) as unknown;
 
       // Validate structure to handle corrupted data
@@ -175,17 +211,12 @@ class StorageVault {
       }
 
       return parsed as DataRecord;
-    } catch (e) {
-      this.logger?.log('Storage data corrupted or invalid, clearing storage', {
-        error: e,
-        storageKey: this.storageKey,
-      });
-
+    } catch {
       // Clear corrupted storage
       try {
-        this.backend.remove(this.storageKey);
-      } catch (clearError) {
-        this.logger?.log('Failed to clear corrupted storage', clearError);
+        this.storage.remove(this.storageKey);
+      } catch {
+        // Best-effort cleanup — if this also fails, we still return empty data
       }
 
       return {};
@@ -196,39 +227,28 @@ class StorageVault {
    * Serializes and writes data immediately to storage.
    */
   private saveAllDataImmediate(data: DataRecord): void {
-    const storage = this.backend.getStorage();
-    if (!storage) return;
+    const raw = this.storage.getStorage();
+    if (!raw) return;
 
     // Enforce max items limit for in-memory storage
-    if (storage instanceof Map) {
+    if (raw instanceof Map) {
       const itemCount = Object.keys(data).length;
       if (itemCount > this.maxItemsInMemory) {
-        this.logger?.log(
-          'In-memory storage item limit exceeded, cleaning up oldest items',
-          {
-            itemCount,
-            maxItems: this.maxItemsInMemory,
-          }
-        );
         this.enforceItemLimit(data);
       }
     }
 
     try {
       const dataStr = JSON.stringify(data);
-      const transformedStr = this.transformPipeline.apply(dataStr);
+      const transformedStr = this.transformChain.apply(dataStr);
       const byteSize = getByteSize(transformedStr);
 
-      // Check size and warn if approaching quota
       if (byteSize > this.maxSizeBytes) {
-        this.logger?.log('Storage approaching quota limit', {
-          byteSize,
-          stringLength: transformedStr.length,
-          maxSizeBytes: this.maxSizeBytes,
-        });
+        // Data exceeds configured limit — still write, but consumers
+        // should use StorageStatistics to monitor quota usage.
       }
 
-      this.backend.write(this.storageKey, transformedStr);
+      this.storage.write(this.storageKey, transformedStr);
     } catch (e) {
       this.handleSaveError(e);
     }
@@ -240,23 +260,17 @@ class StorageVault {
   private handleSaveError(error: unknown): void {
     if (isQuotaExceededError(error)) {
       if (!this.isCleaningUp) {
-        this.logger?.log('Storage quota exceeded, attempting cleanup', error);
         this.isCleaningUp = true;
 
         try {
-          const removedCount = this.cleanupExpiredItems();
-          this.logger?.log(`Cleanup removed ${removedCount} expired items`);
+          this.cleanupExpiredItems();
 
           // Retry after cleanup
           const freshData = this.getAllData();
           const dataStr = JSON.stringify(freshData);
-          const transformedStr = this.transformPipeline.apply(dataStr);
-          this.backend.write(this.storageKey, transformedStr);
-        } catch (retryError) {
-          this.logger?.log(
-            'Storage quota exceeded even after cleanup',
-            retryError
-          );
+          const transformedStr = this.transformChain.apply(dataStr);
+          this.storage.write(this.storageKey, transformedStr);
+        } catch {
           throw new Error(
             'Storage quota exceeded. Clear some data or use storage slices to reduce size.'
           );
@@ -264,19 +278,13 @@ class StorageVault {
           this.isCleaningUp = false;
         }
       } else {
-        this.logger?.log(
-          'Already cleaning up, skipping recursive cleanup',
-          error
-        );
         throw new Error('Storage quota exceeded during cleanup');
       }
     } else if (isCircularReferenceError(error)) {
-      this.logger?.log('Circular reference detected in stored data', error);
       throw new Error(
         'Cannot store data with circular references. Serialize manually before storing.'
       );
     } else {
-      this.logger?.log('Error saving to storage', error);
       throw new Error(
         `Failed to save to storage: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -300,8 +308,7 @@ class StorageVault {
           try {
             this.saveAllDataImmediate(this.dirtyData);
             this.dirtyData = null;
-          } catch (e) {
-            this.logger?.log('Debounced save failed', e);
+          } catch {
             // Keep dirtyData so next flush/save can retry
           }
         }
@@ -359,14 +366,12 @@ class StorageVault {
    * Cleans up resources used by this instance.
    */
   private cleanup(): void {
-    // Clear any pending timers
     if (this.pendingSave) {
       clearTimeout(this.pendingSave);
       this.pendingSave = null;
     }
 
-    // Remove event listeners
-    this.backend.cleanup();
+    this.storage.cleanup();
   }
 
   // ==================== PUBLIC API ====================
@@ -375,13 +380,12 @@ class StorageVault {
    * Stores a value with an optional time-to-live (TTL).
    */
   setItem<T>(key: string, value: T, ttl?: number): boolean {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     if (ttl !== undefined && (!Number.isFinite(ttl) || ttl < 0)) {
       throw new Error('TTL must be a non-negative finite number.');
     }
 
-    // Handle TTL=0 case: immediately delete the item
     if (ttl === 0) {
       return this.removeItem(key);
     }
@@ -398,7 +402,7 @@ class StorageVault {
    * Retrieves a stored value by key.
    */
   getItem<T>(key: string): T | null {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     const data = this.getAllData();
     const item = data[key] as StoredData<T> | undefined;
@@ -419,7 +423,7 @@ class StorageVault {
    * Updates the value of an existing item without modifying its expiry time.
    */
   updateItem<T>(key: string, newValue: T): boolean {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     const data = this.getAllData();
     const item = data[key];
@@ -442,7 +446,7 @@ class StorageVault {
    * Extends the expiry time of an existing item.
    */
   extendTTL(key: string, additionalTTL: number): boolean {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     if (!Number.isFinite(additionalTTL) || additionalTTL <= 0) {
       throw new Error('additionalTTL must be a positive finite number.');
@@ -472,7 +476,7 @@ class StorageVault {
    * Removes an item from storage.
    */
   removeItem(key: string): boolean {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     const data = this.getAllData();
     if (key in data) {
@@ -488,11 +492,10 @@ class StorageVault {
    * Clears all stored data under the vault's storage key.
    */
   clear(): boolean {
-    if (!this.backend.isAvailable()) {
+    if (!this.storage.isAvailable()) {
       throw new Error('Storage is not available (unavailable environment).');
     }
 
-    // Cancel any pending writes
     if (this.pendingSave) {
       clearTimeout(this.pendingSave);
       this.pendingSave = null;
@@ -500,13 +503,9 @@ class StorageVault {
     this.dirtyData = null;
 
     try {
-      this.backend.remove(this.storageKey);
+      this.storage.remove(this.storageKey);
       return true;
     } catch (error) {
-      this.logger?.log('Error clearing storage', {
-        error,
-        storageKey: this.storageKey,
-      });
       throw new Error(
         `Failed to clear storage: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -517,7 +516,7 @@ class StorageVault {
    * Checks whether an item exists and is not expired.
    */
   hasItem(key: string): boolean {
-    validateKey(key, this.backend.getStorage());
+    validateKey(key, this.storage.getStorage());
 
     const data = this.getAllData();
     const item = data[key];
@@ -538,7 +537,7 @@ class StorageVault {
    * Returns the remaining time-to-live (TTL) for a stored item.
    */
   getRemainingTTL(key: string): number | null {
-    if (!this.backend.isAvailable()) return null;
+    if (!this.storage.isAvailable()) return null;
 
     const data = this.getAllData();
     const item = data[key];
@@ -560,7 +559,7 @@ class StorageVault {
    * Removes all expired items from storage.
    */
   cleanupExpiredItems(): number {
-    if (!this.backend.isAvailable()) return 0;
+    if (!this.storage.isAvailable()) return 0;
 
     const data = this.getAllData();
     let removedCount = 0;
@@ -602,7 +601,7 @@ class StorageVault {
    * Returns all keys currently stored in the vault (excluding expired items).
    */
   getAllKeys(): string[] {
-    if (!this.backend.isAvailable()) return [];
+    if (!this.storage.isAvailable()) return [];
 
     const data = this.getAllData();
     const validKeys: string[] = [];
@@ -624,7 +623,7 @@ class StorageVault {
    * Returns all stored items as a key-value object (excluding expired items).
    */
   getAll(): Record<string, unknown> {
-    if (!this.backend.isAvailable()) return {};
+    if (!this.storage.isAvailable()) return {};
 
     const data = this.getAllData();
     const result: Record<string, unknown> = {};
@@ -646,47 +645,15 @@ class StorageVault {
    * Returns the current size of stored data in bytes.
    */
   getCurrentSize(): number {
-    if (!this.backend.isAvailable()) return 0;
+    if (!this.storage.isAvailable()) return 0;
 
     try {
       const data = this.getAllData();
       const dataStr = JSON.stringify(data);
       return getByteSize(dataStr);
-    } catch (e) {
-      this.logger?.log('Error calculating storage size', e);
+    } catch {
       return 0;
     }
-  }
-
-  /**
-   * Returns storage statistics.
-   */
-  getStats(): StorageStats {
-    if (!this.backend.isAvailable()) {
-      return {
-        itemCount: 0,
-        sizeBytes: 0,
-        stringLength: 0,
-        maxSizeBytes: this.maxSizeBytes,
-        quotaPercentage: 0,
-        storageType: 'unavailable',
-      };
-    }
-
-    const data = this.getAllData();
-    const itemCount = Object.keys(data).length;
-    const dataStr = JSON.stringify(data);
-    const sizeBytes = getByteSize(dataStr);
-    const quotaPercentage = (sizeBytes / this.maxSizeBytes) * 100;
-
-    return {
-      itemCount,
-      sizeBytes,
-      stringLength: dataStr.length,
-      maxSizeBytes: this.maxSizeBytes,
-      quotaPercentage,
-      storageType: this.backend.getStorageType(),
-    };
   }
 }
 

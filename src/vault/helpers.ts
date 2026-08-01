@@ -84,15 +84,6 @@ function isValidDataRecord(parsed: unknown): boolean {
   );
 }
 
-/**
- * Checks if the window is available.
- *
- * @returns True if the window is available.
- */
-function isWindowAvailable(): boolean {
-  return typeof window !== 'undefined';
-}
-
 export {
   validateKey,
   isExpired,
@@ -100,5 +91,4 @@ export {
   isQuotaExceededError,
   isCircularReferenceError,
   isValidDataRecord,
-  isWindowAvailable,
 };
