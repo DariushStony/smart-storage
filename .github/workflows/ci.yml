@@ -12,20 +12,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
       # Version intentionally omitted: resolved from the "packageManager"
       # field in package.json so CI and local installs never drift.
-      - uses: pnpm/action-setup@v4
+      # v6+ is required -- it is the first release supporting pnpm 11.
+      - uses: pnpm/action-setup@v6
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -44,20 +45,21 @@ jobs:
     needs: quality
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
       # Version intentionally omitted: resolved from the "packageManager"
       # field in package.json so CI and local installs never drift.
-      - uses: pnpm/action-setup@v4
+      # v6+ is required -- it is the first release supporting pnpm 11.
+      - uses: pnpm/action-setup@v6
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -68,7 +70,7 @@ jobs:
       - run: pnpm build
       - run: pnpm size:check
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -87,24 +89,25 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
       # Version intentionally omitted: resolved from the "packageManager"
       # field in package.json so CI and local installs never drift.
-      - uses: pnpm/action-setup@v4
+      # v6+ is required -- it is the first release supporting pnpm 11.
+      - uses: pnpm/action-setup@v6
 
       - name: Get pnpm store path
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -113,7 +116,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
