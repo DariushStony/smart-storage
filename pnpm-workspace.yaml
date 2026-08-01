@@ -12,16 +12,25 @@ minimumReleaseAgeExclude:
 # dependencies and ships only dist/, so none of these ever reach consumers --
 # they are pinned to keep the development and release environment clean.
 #
-# Each pin is the lowest patched version inside the major its parent expects,
-# to avoid dragging in an incompatible major. Re-check with `pnpm audit` and
-# prune entries once the parent tools ship updated dependencies.
+# Each pin is the lowest patched version inside the major its parent expects.
+#
+# Where more than one major is present in the tree, the pin is RANGE-SCOPED
+# (`pkg@<x.y.z`) so only the vulnerable instance is rewritten. A blanket pin
+# would collapse every major onto one version and can silently downgrade a
+# dependency below its declared range -- see the undici and esbuild notes.
+#
+# Re-check with `pnpm audit` and prune entries once the parent tools ship
+# updated dependencies.
 overrides:
   # GHSA: AST type confusion / prototype pollution -> patched 4.7.9
   handlebars: ^4.7.9
   # GHSA: code injection via _.template, prototype pollution in _.unset/_.omit
   lodash-es: ^4.17.24
-  # GHSA: WebSocket length overflow, request smuggling, Set-Cookie injection
-  undici: ^6.27.0
+  # GHSA: WebSocket length overflow, request smuggling, Set-Cookie injection.
+  # Scoped: only the 6.x line is affected. @semantic-release/github declares
+  # `undici: ^7.0.0`, and a blanket ^6.27.0 pin would downgrade it out of its
+  # own range -- breaking the release path for no security benefit.
+  undici@<6.27.0: ^6.27.0
   # GHSA: arbitrary file write via path traversal
   rollup: ^4.59.0
   # GHSA: method injection in POSIX character classes (both majors affected)
@@ -33,5 +42,7 @@ overrides:
   fast-uri: ^3.1.4
   # GHSA: quadratic CPU via YAML merge-key chains
   js-yaml: ^4.3.0
-  # GHSA: arbitrary file read via dev server on Windows
-  esbuild: ^0.28.1
+  # GHSA: arbitrary file read via dev server on Windows.
+  # Scoped: for 0.x each minor is a breaking line, so a blanket ^0.28.1 pin
+  # would move a 0.27-range consumer across that boundary.
+  esbuild@<0.28.1: ^0.28.1

@@ -7,14 +7,14 @@ settings:
 overrides:
   handlebars: ^4.7.9
   lodash-es: ^4.17.24
-  undici: ^6.27.0
+  undici@<6.27.0: ^6.27.0
   rollup: ^4.59.0
   picomatch@<2.3.2: ^2.3.2
   picomatch@>=4.0.0 <4.0.4: ^4.0.4
   ajv: ^8.18.0
   fast-uri: ^3.1.4
   js-yaml: ^4.3.0
-  esbuild: ^0.28.1
+  esbuild@<0.28.1: ^0.28.1
 
 importers:
 
@@ -2604,6 +2604,10 @@ packages:
     resolution: {integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==}
     engines: {node: '>=18.17'}
 
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+    engines: {node: '>=20.18.1'}
+
   unicode-emoji-modifier-base@1.0.0:
     resolution: {integrity: sha512-yLSH4py7oFH3oG/9K+XWrz1pSi3dfUrWEnInbxMfArOfc1+33BlGPQtLsOYwvdMy11AwUBetYuaRxSPqgkq+8g==}
     engines: {node: '>=4'}
@@ -3428,7 +3432,7 @@ snapshots:
       p-filter: 4.1.0
       semantic-release: 25.0.8(supports-color@7.2.0)(typescript@7.0.2)
       tinyglobby: 0.2.15
-      undici: 6.28.0
+      undici: 7.29.0
       url-join: 5.0.0
     transitivePeerDependencies:
       - kerberos
@@ -5057,6 +5061,8 @@ snapshots:
   undici-types@8.3.0: {}
 
   undici@6.28.0: {}
+
+  undici@7.29.0: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 

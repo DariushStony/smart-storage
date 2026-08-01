@@ -768,7 +768,7 @@ describe('introspection accessors', () => {
     expect(data.timed?.expiry).toBeTypeOf('number');
   });
 
-  it('getAllData returns a copy, so mutation cannot corrupt the vault', () => {
+  it('getAllData is isolated against top-level mutation', () => {
     vi.useFakeTimers();
     const vault = makeVault({ debounceMs: 100 });
     vault.setItem('k', 'v');
@@ -777,6 +777,23 @@ describe('introspection accessors', () => {
     delete data.k;
 
     expect(vault.getItem('k')).toBe('v');
+  });
+
+  it('getAllData is a SHALLOW copy: nested mutation reaches pending writes', () => {
+    vi.useFakeTimers();
+    const vault = makeVault({ debounceMs: 100 });
+    vault.setItem('k', 'original');
+
+    const data = vault.getAllData();
+    const record = data.k;
+    if (!record) throw new Error('expected a record for k');
+    record.value = 'tampered';
+
+    // Documenting the real contract rather than the one we might assume:
+    // getAllData() spreads the pending record map one level deep, so the
+    // StoredData objects inside are shared with the vault. Callers must treat
+    // the result as read-only; deep-cloning it is their responsibility.
+    expect(vault.getItem('k')).toBe('tampered');
   });
 
   it('getCurrentSize grows as data is added', () => {

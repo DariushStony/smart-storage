@@ -48,6 +48,9 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, () => {
+// Bind loopback explicitly. Omitting the host makes Node listen on 0.0.0.0,
+// which would serve the whole repo root -- including .git/ -- to the local
+// network for as long as the tests run. Playwright connects over localhost.
+server.listen(PORT, '127.0.0.1', () => {
   process.stdout.write(`e2e server listening on http://localhost:${PORT}\n`);
 });

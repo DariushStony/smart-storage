@@ -18,7 +18,10 @@ export default defineConfig({
       // numbers have settled rather than picking one up front.
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/index.ts'],
+      // Barrel files only. Note `src/**/index.ts` would ALSO match
+      // `src/index.ts`, which is not a barrel -- it holds getStorageSlice()
+      // and disposeStorageSlice() and must stay measured.
+      exclude: ['src/*/index.ts'],
     },
   },
 });

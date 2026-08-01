@@ -256,7 +256,7 @@ test.describe('real quota pressure', () => {
   // Chromium allows several MB per origin, so filling it takes a big payload.
   test.slow();
 
-  test('a quota breach surfaces as an error rather than silent data loss', async ({
+  test('a real browser quota breach is reached and handled', async ({
     page,
   }) => {
     const outcome = await page.evaluate(() => {
@@ -264,26 +264,34 @@ test.describe('real quota pressure', () => {
       const storage = getStorageSlice('E2E_QUOTA', { debounceMs: 0 });
       const chunk = 'x'.repeat(512 * 1024);
 
-      try {
-        for (let i = 0; i < 40; i += 1) {
+      // Keep going until the browser genuinely refuses, so the assertion
+      // below is never skipped because the payload happened to fit. The cap
+      // is a runaway guard, not the expected exit.
+      for (let i = 0; i < 200; i += 1) {
+        try {
           storage.setItem(`chunk-${String(i)}`, chunk);
+        } catch (error) {
+          return {
+            threw: true,
+            chunks: i,
+            message: error instanceof Error ? error.message : String(error),
+          };
         }
-        return { threw: false, message: '' };
-      } catch (error) {
-        return {
-          threw: true,
-          message: error instanceof Error ? error.message : String(error),
-        };
       }
+      return { threw: false, chunks: 200, message: '' };
     });
 
-    // Either the browser absorbed it or we got a clear quota error -- never a
-    // silent truncation. Both outcomes are acceptable; a crash is not.
-    if (outcome.threw) {
-      expect(outcome.message).toMatch(/quota|storage/i);
-    }
+    // Assert unconditionally: a silent success here would mean the browser
+    // accepted 100 MB, which is not a real Web Storage implementation.
+    expect(
+      outcome.threw,
+      `expected a quota breach, but ${String(outcome.chunks)} x 512 KB writes all succeeded`
+    ).toBe(true);
+    // The vault must translate the DOMException into its own clear message
+    // rather than leaking a raw browser error.
+    expect(outcome.message).toMatch(/quota|storage/i);
 
-    // Whatever happened, the page must still be alive and the vault usable.
+    // The page must still be alive and a fresh slice usable afterwards.
     const stillWorks = await page.evaluate(() => {
       const { getStorageSlice } = window.smartStorage;
       const fresh = getStorageSlice('E2E_QUOTA_AFTER', { debounceMs: 0 });
