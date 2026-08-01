@@ -173,7 +173,7 @@ Prefixes within one slice, or separate slices? Both are valid — the trade-off 
 write cost versus isolation.
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // One slice, prefixed keys — simplest mental model.
 // Every write re-serializes the whole blob.
@@ -235,7 +235,7 @@ import {
   getStorageSlice,
   disposeStorageSlice,
   StorageVault,
-} from '@dariushstony/smart-storage';
+} from '@faravahar/smart-storage';
 
 const temp = getStorageSlice('TEMP', { storageType: 'session' });
 

@@ -1,6 +1,6 @@
 # Examples
 
-This folder contains practical usage examples for `@dariushstony/smart-storage`.
+This folder contains practical usage examples for `@faravahar/smart-storage`.
 
 ## 📂 Available Examples
 
@@ -38,7 +38,7 @@ For comprehensive examples and patterns, see:
 ### User Preferences
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const prefs = getStorageSlice('USER_PREFS');
 prefs.setItem('theme', 'dark');
@@ -48,7 +48,7 @@ prefs.setItem('language', 'en');
 ### API Cache with TTL
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const cache = getStorageSlice('API_CACHE');
 
@@ -59,7 +59,7 @@ cache.setItem('products', productsData, 5 * 60 * 1000);
 ### Session Storage
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // Cleared when tab closes
 const session = getStorageSlice('WIZARD', {
@@ -72,7 +72,7 @@ session.setItem('currentStep', 2);
 ### Testing with In-Memory Storage
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const testStorage = getStorageSlice('TEST', {
   storageType: 'in-memory',
@@ -87,8 +87,8 @@ testStorage.setItem('key', 'value');
 ### Transform Chain (Compression)
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
-import type { StorageTransform } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
+import type { StorageTransform } from '@faravahar/smart-storage';
 import LZString from 'lz-string';
 
 const compressionTransform: StorageTransform = {
@@ -109,8 +109,8 @@ Logging is opt-in: add a `LoggingHandler` to the transform chain rather than
 passing a logger option.
 
 ```typescript
-import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
-import type { StorageLogger } from '@dariushstony/smart-storage';
+import { getStorageSlice, LoggingHandler } from '@faravahar/smart-storage';
+import type { StorageLogger } from '@faravahar/smart-storage';
 
 const logger: StorageLogger = {
   log: (message, error) => {

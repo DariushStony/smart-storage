@@ -3,7 +3,7 @@
 ## Super Simple - One Vault for Everything!
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -20,7 +20,7 @@ const storage = getStorageSlice('MY_APP');
 The vault supports three storage types:
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // 'local' - localStorage (persists across browser sessions)
 const persistentStorage = getStorageSlice('DATA', { storageType: 'local' });
@@ -43,7 +43,7 @@ const memoryStorage = getStorageSlice('TEST', { storageType: 'in-memory' });
 ## ✨ Basic Usage
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -74,7 +74,7 @@ storage.clear();
 ## ⏰ With TTL (Auto-Expiry)
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -138,7 +138,7 @@ storage.setItem('analytics:last-visit', Date.now());
 
 ```typescript
 // Use sessionStorage for temporary wizard state
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const wizardStorage = getStorageSlice('CHECKOUT_WIZARD', {
   storageType: 'session', // Cleared when user closes tab
@@ -162,7 +162,7 @@ function CheckoutWizard() {
 
 ```typescript
 // Use in-memory storage for tests
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 describe('My Component', () => {
   const testStorage = getStorageSlice('TEST_DATA', {
@@ -189,7 +189,7 @@ describe('My Component', () => {
 
 ```typescript
 // components/theme-switcher.tsx
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -212,7 +212,7 @@ function ThemeSwitcher() {
 
 ```typescript
 // services/product-service.ts
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -239,7 +239,7 @@ async function getProduct(id: number) {
 
 ```typescript
 // pages/checkout.tsx
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -267,7 +267,7 @@ function enableNewCheckout() {
 
 ```typescript
 // components/checkout-form.tsx
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 import { useState, useEffect } from 'react';
@@ -322,7 +322,7 @@ function CheckoutForm() {
 
 ```typescript
 // services/cart-service.ts
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -362,7 +362,7 @@ function clearCart() {
 
 ```typescript
 // hooks/useLocalStorage.ts
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 import { useState, useEffect } from 'react';
@@ -402,7 +402,7 @@ import {
   cleanupStorage,
   getStorageStats,
   flushStorage,
-} from '@dariushstony/smart-storage';
+} from '@faravahar/smart-storage';
 
 // Cleanup expired items
 const removed = cleanupStorage();
@@ -452,7 +452,7 @@ For detailed statistics, construct a `StorageStatistics` — stats are a
 pluggable concern, not a vault method:
 
 ```typescript
-import { StorageStatistics } from '@dariushstony/smart-storage';
+import { StorageStatistics } from '@faravahar/smart-storage';
 
 const statistics = new StorageStatistics(
   storage.getStorageAdapter(),
@@ -522,7 +522,7 @@ statistics.collect(() => storage.getAllData());
 **One line to rule them all:**
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 ```
@@ -552,7 +552,7 @@ const storage = getStorageSlice('MY_APP');
 **That's all you need! Simple, clean, powerful.** 🚀
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 storage.setItem('awesome', true);

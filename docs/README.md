@@ -1,4 +1,4 @@
-# @dariushstony/smart-storage Documentation
+# @faravahar/smart-storage Documentation
 
 Complete documentation for smart-storage - a robust Web Storage wrapper with TTL, transforms, and SSR safety.
 

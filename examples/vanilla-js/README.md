@@ -1,6 +1,6 @@
 # Vanilla JavaScript Example
 
-This example demonstrates how to use `@dariushstony/smart-storage` in a vanilla JavaScript/TypeScript environment.
+This example demonstrates how to use `@faravahar/smart-storage` in a vanilla JavaScript/TypeScript environment.
 
 ## 🚀 Running the Example
 
@@ -31,7 +31,7 @@ This example covers:
 ### Basic Operations
 
 ```javascript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -74,7 +74,7 @@ const memory = getStorageSlice('TEST', { storageType: 'in-memory' });
 ### Monitoring & Stats
 
 ```javascript
-import { StorageStatistics } from '@dariushstony/smart-storage';
+import { StorageStatistics } from '@faravahar/smart-storage';
 
 // Statistics are opt-in — build one from the vault's accessors
 const statistics = new StorageStatistics(

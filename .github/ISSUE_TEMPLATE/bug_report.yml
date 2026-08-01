@@ -28,7 +28,7 @@ body:
     id: version
     attributes:
       label: Package version
-      description: Output of `npm ls @dariushstony/smart-storage`
+      description: Output of `npm ls @faravahar/smart-storage`
       placeholder: 1.0.1
     validations:
       required: true
@@ -76,7 +76,7 @@ body:
       description: The smallest snippet that shows the problem.
       render: typescript
       placeholder: |
-        import { getStorageSlice } from '@dariushstony/smart-storage';
+        import { getStorageSlice } from '@faravahar/smart-storage';
 
         const storage = getStorageSlice('REPRO', { debounceMs: 0 });
         storage.setItem('theme', 'dark');

@@ -1,6 +1,6 @@
-# @dariushstony/smart-storage
+# @faravahar/smart-storage
 
-[![npm version](https://badge.fury.io/js/@dariushstony%2Fsmart-storage.svg)](https://www.npmjs.com/package/@dariushstony/smart-storage)
+[![npm version](https://badge.fury.io/js/@faravahar%2Fsmart-storage.svg)](https://www.npmjs.com/package/@faravahar/smart-storage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg)](https://www.typescriptlang.org/)
 
@@ -21,11 +21,11 @@ Designed for **real-world frontend applications** where correctness, performance
 ## 📦 Installation
 
 ```bash
-npm install @dariushstony/smart-storage
+npm install @faravahar/smart-storage
 # or
-yarn add @dariushstony/smart-storage
+yarn add @faravahar/smart-storage
 # or
-pnpm add @dariushstony/smart-storage
+pnpm add @faravahar/smart-storage
 ```
 
 **Works with:**
@@ -92,7 +92,7 @@ import {
   InlineTransformHandler, // Wraps a plain { serialize, deserialize } object
   TransformChain, // Pre-built chain of transform handlers
   StorageStatistics, // Opt-in stats collection
-} from '@dariushstony/smart-storage';
+} from '@faravahar/smart-storage';
 
 // Type exports
 import type {
@@ -104,7 +104,7 @@ import type {
   StoredData,
   DataRecord,
   IStorage,
-} from '@dariushstony/smart-storage';
+} from '@faravahar/smart-storage';
 ```
 
 > **Note:** `StorageType` is a runtime value (a `const` object), so import it
@@ -118,7 +118,7 @@ import type {
 StorageVault supports three storage backends:
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // 'local' - localStorage (persists across browser sessions)
 const persistent = getStorageSlice('USER_DATA', {
@@ -151,7 +151,7 @@ const testing = getStorageSlice('TEST_DATA', {
 ### ESM (Modern JavaScript)
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // Create a storage slice (localStorage by default)
 const storage = getStorageSlice('MY_APP');
@@ -167,7 +167,7 @@ console.log(theme); // → "dark"
 ### CommonJS (Node.js)
 
 ```javascript
-const { getStorageSlice } = require('@dariushstony/smart-storage');
+const { getStorageSlice } = require('@faravahar/smart-storage');
 
 // Create a storage slice
 const storage = getStorageSlice('MY_APP');
@@ -179,7 +179,7 @@ storage.setItem('user', { name: 'dariush', id: 123 });
 ### TypeScript
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 interface User {
   name: string;
@@ -205,7 +205,7 @@ if (user) {
 All data is stored as one JSON blob per slice. Slices help reduce re-serialization costs and isolate concerns.
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // Persistent user preferences
 const userPrefs = getStorageSlice('USER_PREFERENCES', {
@@ -252,7 +252,7 @@ getStorageSlice('USER_DATA');
 ## ⏱ TTL (Time-to-Live)
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -346,7 +346,7 @@ const analyticsStorage = getStorageSlice('ANALYTICS', { debounceMs: 500 });
 ### Recommended pattern
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 // Server → pass initial data via props
 // Client → re-store in useEffect or client-side code
@@ -390,10 +390,7 @@ you pay nothing if you don't use them. Construct a `StorageStatistics` from the
 vault's accessors and call `collect()`:
 
 ```typescript
-import {
-  getStorageSlice,
-  StorageStatistics,
-} from '@dariushstony/smart-storage';
+import { getStorageSlice, StorageStatistics } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 
@@ -440,7 +437,7 @@ if (stats.quotaPercentage > 80) {
 ## 🗑 Clearing Data
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 const storage = getStorageSlice('MY_APP');
 storage.clear(); // Clears only this slice
@@ -455,10 +452,7 @@ storage.clear(); // Clears only this slice
 Useful for temporary or short-lived slices. Removes the instance from the singleton cache and cleans up event listeners.
 
 ```typescript
-import {
-  getStorageSlice,
-  disposeStorageSlice,
-} from '@dariushstony/smart-storage';
+import { getStorageSlice, disposeStorageSlice } from '@faravahar/smart-storage';
 
 const tempStorage = getStorageSlice('TEMP_SESSION', {
   storageType: 'session',
@@ -486,7 +480,7 @@ Flushes pending writes, cleans up listeners, and removes every vault instance
 from the singleton cache.
 
 ```typescript
-import { StorageVault } from '@dariushstony/smart-storage';
+import { StorageVault } from '@faravahar/smart-storage';
 
 // In test teardown:
 afterEach(() => {
@@ -497,7 +491,7 @@ afterEach(() => {
 ### Use in-memory storage for tests
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
 
 describe('My tests', () => {
   const testVault = getStorageSlice('TEST_DATA', {
@@ -525,8 +519,8 @@ Logging is a **pluggable concern**, not a constructor option. Add a
 logging entirely, with zero overhead.
 
 ```typescript
-import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
-import type { StorageLogger } from '@dariushstony/smart-storage';
+import { getStorageSlice, LoggingHandler } from '@faravahar/smart-storage';
+import type { StorageLogger } from '@faravahar/smart-storage';
 
 const customLogger: StorageLogger = {
   log: (message, error) => {
@@ -635,8 +629,8 @@ These accessors exist mainly to wire up pluggable concerns such as
 You can chain multiple transforms (compression, encryption, encoding) to process data before storage:
 
 ```typescript
-import { getStorageSlice } from '@dariushstony/smart-storage';
-import type { StorageTransform } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@faravahar/smart-storage';
+import type { StorageTransform } from '@faravahar/smart-storage';
 
 // Example: Compression transform (requires lz-string package)
 const compressionTransform: StorageTransform = {
@@ -796,7 +790,7 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 **Dariush Hadipour**
 
 - GitHub: [@DariushStony](https://github.com/DariushStony)
-- Package: [@dariushstony/smart-storage](https://www.npmjs.com/package/@dariushstony/smart-storage)
+- Package: [@faravahar/smart-storage](https://www.npmjs.com/package/@faravahar/smart-storage)
 
 ---
 
