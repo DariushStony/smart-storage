@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/DariushStony/smart-storage/compare/v1.0.2...v1.0.3) (2026-08-01)
+
+### Bug Fixes
+
+- release the [@faravahar-scoped](https://github.com/faravahar-scoped) package ([9f9b08d](https://github.com/DariushStony/smart-storage/commit/9f9b08de2f9c285fb8f005d644c6982b04fb923d))
+
 ## [1.0.2](https://github.com/DariushStony/smart-storage/compare/v1.0.1...v1.0.2) (2026-08-01)
 
 ### Bug Fixes
