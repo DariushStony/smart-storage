@@ -16,11 +16,7 @@ import {
   isValidDataRecord,
   validateKey,
 } from './helpers';
-import type {
-  DataRecord,
-  StorageVaultOptions,
-  StoredData,
-} from './types';
+import type { DataRecord, StorageVaultOptions, StoredData } from './types';
 
 /**
  * StorageVault - A unified wrapper around Web Storage with TTL, transforms, and safe handling.
