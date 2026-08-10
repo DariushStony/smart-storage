@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/DariushStony/smart-storage/compare/v1.1.1...v1.1.2) (2026-08-10)
+
+### Bug Fixes
+
+- retry npm publish after org access setup ([3a4d73a](https://github.com/DariushStony/smart-storage/commit/3a4d73a77f90f0c5d7a247ca627fde21e6bc0979))
+
 ## [1.1.1](https://github.com/DariushStony/smart-storage/compare/v1.1.0...v1.1.1) (2026-08-10)
 
 ### Bug Fixes

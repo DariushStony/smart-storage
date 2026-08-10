@@ -8,7 +8,7 @@
     "url": "https://github.com/DariushStony/smart-storage/issues"
   },
   "homepage": "https://github.com/DariushStony/smart-storage#readme",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": false,
   "publishConfig": {
     "access": "public"
