@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/DariushStony/smart-storage/compare/v1.1.0...v1.1.1) (2026-08-10)
+
+### Bug Fixes
+
+- publish scoped package with public access ([1e52e2b](https://github.com/DariushStony/smart-storage/commit/1e52e2ba1d44d2e6727ee694a6814c6891463c04))
+
 # [1.1.0](https://github.com/DariushStony/smart-storage/compare/v1.0.2...v1.1.0) (2026-08-10)
 
 ### Features
