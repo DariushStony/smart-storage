@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/DariushStony/smart-storage/compare/v1.0.2...v1.1.0) (2026-08-10)
+
+### Features
+
+- trigger publish ([ea41d08](https://github.com/DariushStony/smart-storage/commit/ea41d08be1b2a2a9f6c9d69f86a760f3b75ce953))
+- trigger publish ([adbc629](https://github.com/DariushStony/smart-storage/commit/adbc629e9b8c870abbcd0f13898b18f5501dc553))
+
 ## [1.0.2](https://github.com/DariushStony/smart-storage/compare/v1.0.1...v1.0.2) (2026-08-01)
 
 ### Bug Fixes
