@@ -80,7 +80,7 @@
     "@size-limit/preset-small-lib": "^13.0.3",
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^4.1.10",
-    "happy-dom": "^20.11.1",
+    "happy-dom": "^20.11.2",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "oxlint": "^1.76.0",
