@@ -79,8 +79,8 @@
     "@semantic-release/release-notes-generator": "^14.1.1",
     "@size-limit/preset-small-lib": "^13.0.3",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "^4.1.10",
-    "happy-dom": "^20.11.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "happy-dom": "^20.11.6",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
     "oxlint": "^1.80.0",
@@ -90,7 +90,7 @@
     "size-limit": "^13.0.3",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "lint-staged": {
     "{src,tests}/**/*.{ts,tsx}": [
