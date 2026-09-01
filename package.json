@@ -86,7 +86,7 @@
     "oxlint": "^1.80.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.9.6",
-    "semantic-release": "^25.0.8",
+    "semantic-release": "^25.0.9",
     "size-limit": "^13.0.3",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
