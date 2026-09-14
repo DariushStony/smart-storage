@@ -70,7 +70,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^11.0.1",
@@ -79,8 +79,8 @@
     "@semantic-release/release-notes-generator": "^14.1.1",
     "@size-limit/preset-small-lib": "^13.0.3",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "^4.1.11",
-    "happy-dom": "^20.11.6",
+    "@vitest/coverage-v8": "^5.0.0",
+    "happy-dom": "^20.14.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
     "oxlint": "^1.80.0",
@@ -90,7 +90,7 @@
     "size-limit": "^13.0.3",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "lint-staged": {
     "{src,tests}/**/*.{ts,tsx}": [
