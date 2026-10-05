@@ -105,8 +105,9 @@ vault.setItem('bigObject', largeData); // Automatically compressed
 
 ### Custom Logger Integration
 
-Logging is opt-in: add a `LoggingHandler` to the transform chain rather than
-passing a logger option.
+Pass a `logger` to hear about storage problems (corrupted data, quota, failed
+writes). Add a `LoggingHandler` to the transform chain as well to observe data
+flowing through.
 
 ```typescript
 import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
@@ -120,6 +121,7 @@ const logger: StorageLogger = {
 };
 
 const vault = getStorageSlice('APP', {
+  logger,
   transforms: [new LoggingHandler(logger)],
 });
 ```

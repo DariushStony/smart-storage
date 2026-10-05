@@ -1,3 +1,5 @@
+import { safeLog } from '../logger/safe-log.js';
+import type { StorageLogger } from '../logger/storage-logger.js';
 import type { IStorage } from '../storage/storage.interface.js';
 import { createStorage } from '../storage/storage.factory.js';
 import { DEFAULT_STORAGE_TYPE } from '../storage/storage-type.js';
@@ -21,10 +23,11 @@ import type { DataRecord, StorageVaultOptions, StoredData } from './types.js';
 /**
  * StorageVault - A unified wrapper around Web Storage with TTL, transforms, and safe handling.
  *
- * Logging and statistics are **detachable concerns**, not baked into the vault:
+ * Logging and statistics are optional concerns:
  *
- * - **Logging**: Add a `LoggingHandler` to the transform chain to observe data flowing through.
- *   Remove it from the array to disable logging — zero code changes, zero overhead.
+ * - **Logging**: Pass a `logger` to be told about storage problems the vault handles
+ *   (corrupted data, quota, failed writes). Add a `LoggingHandler` to the transform chain
+ *   as well to observe data flowing through.
  *
  * - **Statistics**: Use `StorageStatistics` externally to collect metrics on demand.
  *   Don't create one if you don't need stats — zero overhead.
@@ -37,6 +40,7 @@ class StorageVault {
   private storage: IStorage;
   private transformChain: TransformChain;
   private storageKey: string;
+  private logger?: StorageLogger;
   private maxSizeBytes: number;
   private maxItemsInMemory: number;
   private debounceMs: number;
@@ -54,6 +58,7 @@ class StorageVault {
       maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
       maxItemsInMemory = DEFAULT_MAX_ITEMS_IN_MEMORY,
       debounceMs = DEFAULT_DEBOUNCE_MS,
+      logger,
       transformChain,
       transforms = [],
     } = options;
@@ -69,6 +74,7 @@ class StorageVault {
           maxSizeBytes,
           maxItemsInMemory,
           debounceMs,
+          logger,
           transformChain,
           transforms,
         })
@@ -77,6 +83,9 @@ class StorageVault {
 
     const instance = StorageVault.instances.get(key);
     if (!instance) {
+      safeLog(logger, 'Failed to create or retrieve StorageVault instance', {
+        key,
+      });
       throw new Error(
         `Failed to create or retrieve StorageVault instance: ${key}`
       );
@@ -126,15 +135,17 @@ class StorageVault {
       maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
       maxItemsInMemory = DEFAULT_MAX_ITEMS_IN_MEMORY,
       debounceMs = DEFAULT_DEBOUNCE_MS,
+      logger,
       transformChain,
       transforms = [],
     } = options;
 
     this.storageKey = storageKey;
+    this.logger = logger;
     this.maxSizeBytes = maxSizeBytes;
     this.maxItemsInMemory = maxItemsInMemory;
     this.debounceMs = debounceMs;
-    this.storage = createStorage(storageType);
+    this.storage = createStorage(storageType, logger);
     this.transformChain = transformChain ?? TransformChain.from(transforms);
 
     // Setup pagehide handler to flush pending writes
@@ -207,12 +218,22 @@ class StorageVault {
       }
 
       return parsed as DataRecord;
-    } catch {
+    } catch (e) {
+      safeLog(
+        this.logger,
+        'Storage data corrupted or invalid, clearing storage',
+        {
+          error: e,
+          storageKey: this.storageKey,
+        }
+      );
+
       // Clear corrupted storage
       try {
         this.storage.remove(this.storageKey);
-      } catch {
+      } catch (clearError) {
         // Best-effort cleanup — if this also fails, we still return empty data
+        safeLog(this.logger, 'Failed to clear corrupted storage', clearError);
       }
 
       return {};
@@ -230,6 +251,11 @@ class StorageVault {
     if (raw instanceof Map) {
       const itemCount = Object.keys(data).length;
       if (itemCount > this.maxItemsInMemory) {
+        safeLog(
+          this.logger,
+          'In-memory storage item limit exceeded, cleaning up oldest items',
+          { itemCount, maxItems: this.maxItemsInMemory }
+        );
         this.enforceItemLimit(data);
       }
     }
@@ -240,8 +266,12 @@ class StorageVault {
       const byteSize = getByteSize(transformedStr);
 
       if (byteSize > this.maxSizeBytes) {
-        // Data exceeds configured limit — still write, but consumers
-        // should use StorageStatistics to monitor quota usage.
+        // Over the configured limit: still write, and tell the logger.
+        safeLog(this.logger, 'Storage approaching quota limit', {
+          byteSize,
+          stringLength: transformedStr.length,
+          maxSizeBytes: this.maxSizeBytes,
+        });
       }
 
       this.storage.write(this.storageKey, transformedStr);
@@ -256,17 +286,31 @@ class StorageVault {
   private handleSaveError(error: unknown): void {
     if (isQuotaExceededError(error)) {
       if (!this.isCleaningUp) {
+        safeLog(
+          this.logger,
+          'Storage quota exceeded, attempting cleanup',
+          error
+        );
         this.isCleaningUp = true;
 
         try {
-          this.cleanupExpiredItems();
+          const removedCount = this.cleanupExpiredItems();
+          safeLog(
+            this.logger,
+            `Cleanup removed ${String(removedCount)} expired items`
+          );
 
           // Retry after cleanup
           const freshData = this.getAllData();
           const dataStr = JSON.stringify(freshData);
           const transformedStr = this.transformChain.apply(dataStr);
           this.storage.write(this.storageKey, transformedStr);
-        } catch {
+        } catch (retryError) {
+          safeLog(
+            this.logger,
+            'Storage quota exceeded even after cleanup',
+            retryError
+          );
           throw new Error(
             'Storage quota exceeded. Clear some data or use storage slices to reduce size.'
           );
@@ -274,13 +318,20 @@ class StorageVault {
           this.isCleaningUp = false;
         }
       } else {
+        safeLog(
+          this.logger,
+          'Already cleaning up, skipping recursive cleanup',
+          error
+        );
         throw new Error('Storage quota exceeded during cleanup');
       }
     } else if (isCircularReferenceError(error)) {
+      safeLog(this.logger, 'Circular reference detected in stored data', error);
       throw new Error(
         'Cannot store data with circular references. Serialize manually before storing.'
       );
     } else {
+      safeLog(this.logger, 'Error saving to storage', error);
       throw new Error(
         `Failed to save to storage: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -304,8 +355,9 @@ class StorageVault {
           try {
             this.saveAllDataImmediate(this.dirtyData);
             this.dirtyData = null;
-          } catch {
+          } catch (e) {
             // Keep dirtyData so next flush/save can retry
+            safeLog(this.logger, 'Debounced save failed', e);
           }
         }
         this.pendingSave = null;
@@ -502,6 +554,10 @@ class StorageVault {
       this.storage.remove(this.storageKey);
       return true;
     } catch (error) {
+      safeLog(this.logger, 'Error clearing storage', {
+        error,
+        storageKey: this.storageKey,
+      });
       throw new Error(
         `Failed to clear storage: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -647,7 +703,8 @@ class StorageVault {
       const data = this.getAllData();
       const dataStr = JSON.stringify(data);
       return getByteSize(dataStr);
-    } catch {
+    } catch (e) {
+      safeLog(this.logger, 'Error calculating storage size', e);
       return 0;
     }
   }

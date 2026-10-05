@@ -102,9 +102,12 @@ low-level read/write, browser event management.
 
 ### 8. `logger/` and `statistics/` — Pluggable Concerns
 
-Neither is a constructor option, and neither is built into the vault:
+Both are optional:
 
-- **Logging** — add a `LoggingHandler` to the transform chain
+- **Logging** — pass a `logger` option to hear about storage problems the vault
+  handles (corrupted data, quota, failed writes, web storage that is inaccessible at
+  startup). Add a
+  `LoggingHandler` to the transform chain to also observe data flowing through
 - **Statistics** — construct a `StorageStatistics` on demand
 
 Skip them and you pay no cost.

@@ -125,8 +125,8 @@ There is nothing to initialize — the first call builds and caches the instance
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Errors are not thrown at you — write operations return `false` and, if you added
-a `LoggingHandler`, the failure is reported through your logger.
+Storage problems the vault recovers from are not thrown at you; if you pass a
+`logger`, they are reported through it.
 
 ## Slice Selection Guide
 
