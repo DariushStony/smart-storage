@@ -1,3 +1,4 @@
+import type { StorageLogger } from '../logger/storage-logger.js';
 import { InMemoryStorage } from './in-memory-storage.js';
 import { LocalStorage } from './local-storage.js';
 import { SessionStorage } from './session-storage.js';
@@ -8,12 +9,15 @@ import type { StorageTypeValue } from './storage-type.js';
 /**
  * Factory for creating storage instances based on the storage type.
  */
-function createStorage(storageType: StorageTypeValue): IStorage {
+function createStorage(
+  storageType: StorageTypeValue,
+  logger?: StorageLogger
+): IStorage {
   switch (storageType) {
     case StorageType.Local:
-      return new LocalStorage();
+      return new LocalStorage(logger);
     case StorageType.Session:
-      return new SessionStorage();
+      return new SessionStorage(logger);
     case StorageType.InMemory:
       return new InMemoryStorage();
     default: {

@@ -1,3 +1,4 @@
+import type { StorageLogger } from '../logger/storage-logger.js';
 import { isWindowAvailable } from './environment.js';
 import type { IStorage } from './storage.interface.js';
 
@@ -10,7 +11,7 @@ class SessionStorage implements IStorage {
   private storage: Storage | Map<string, string> | null = null;
   private unloadHandler: (() => void) | null = null;
 
-  constructor() {
+  constructor(private logger?: StorageLogger) {
     this.initialize();
   }
 
@@ -18,7 +19,11 @@ class SessionStorage implements IStorage {
     if (isWindowAvailable()) {
       try {
         this.storage = sessionStorage;
-      } catch {
+      } catch (e) {
+        this.logger?.log(
+          'Web storage is not accessible. Falling back to in-memory storage.',
+          e
+        );
         this.storage = new Map();
       }
     } else {

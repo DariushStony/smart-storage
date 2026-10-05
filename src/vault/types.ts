@@ -1,3 +1,4 @@
+import type { StorageLogger } from '../logger/storage-logger.js';
 import type { StorageTypeValue } from '../storage/storage-type.js';
 import type { TransformChain } from '../transform/transform-chain.js';
 import type { TransformHandler } from '../transform/transform-handler.js';
@@ -19,9 +20,9 @@ type DataRecord = Record<string, StoredData<unknown>>;
 /**
  * Configuration options for StorageVault.
  *
- * Logging and statistics are **not** configured here — they are pluggable concerns:
- *
- * - **Logging**: Add a `LoggingHandler` to the transform chain. Remove it to disable logging.
+ * - **Logging**: `logger` reports storage problems (corrupted data, quota, failed writes,
+ *   blocked web storage). To also observe data flowing through the transform chain,
+ *   add a `LoggingHandler` to it.
  * - **Statistics**: Use `StorageStatistics` externally. Don't create one if you don't need stats.
  */
 interface StorageVaultOptions {
@@ -30,6 +31,20 @@ interface StorageVaultOptions {
   maxSizeBytes?: number;
   maxItemsInMemory?: number;
   debounceMs?: number;
+
+  /**
+   * Receives a message for every storage problem the vault handles or recovers from:
+   * corrupted data being cleared, quota breaches and cleanups, failed writes, and web
+   * storage being blocked (the vault then falls back to memory). Optional; without it
+   * the vault stays silent. It is not part of the singleton key, so the logger of the
+   * call that first creates a slice is the one that stays.
+   *
+   * @example
+   * const vault = getStorageSlice('DATA', {
+   *   logger: { log: (message, error) => reportToSentry(message, error) },
+   * });
+   */
+  logger?: StorageLogger;
 
   /**
    * A pre-built TransformChain instance (Chain of Responsibility).

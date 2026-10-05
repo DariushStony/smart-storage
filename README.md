@@ -520,12 +520,13 @@ describe('My tests', () => {
 
 ## 🧱 Error Handling & Logging
 
-Logging is a **pluggable concern**, not a constructor option. Add a
-`LoggingHandler` to the transform chain to enable it — remove it to disable
-logging entirely, with zero overhead.
+Pass a `logger` to be told about every storage problem the vault handles:
+corrupted data being cleared, quota breaches and cleanups, failed writes, and
+web storage being blocked (the vault then falls back to memory). Without a
+logger the vault stays silent.
 
 ```typescript
-import { getStorageSlice, LoggingHandler } from '@dariushstony/smart-storage';
+import { getStorageSlice } from '@dariushstony/smart-storage';
 import type { StorageLogger } from '@dariushstony/smart-storage';
 
 const customLogger: StorageLogger = {
@@ -538,9 +539,24 @@ const customLogger: StorageLogger = {
 
 const vault = getStorageSlice('APP_DATA', {
   storageType: 'local',
+  logger: customLogger,
+});
+```
+
+To also observe the data flowing through the transform chain, add a
+`LoggingHandler` to it. That is a separate, opt-in concern:
+
+```typescript
+import { LoggingHandler } from '@dariushstony/smart-storage';
+
+const traced = getStorageSlice('APP_DATA', {
+  logger: customLogger,
   transforms: [new LoggingHandler(customLogger)],
 });
 ```
+
+`logger` is not part of the singleton key, so when a slice is requested more
+than once, the logger of the call that created it is the one that stays.
 
 ---
 
@@ -552,7 +568,8 @@ const customStorage = getStorageSlice('CUSTOM', {
   debounceMs: 200, // Custom debounce delay
   maxSizeBytes: 10_000_000, // 10MB quota warning threshold
   maxItemsInMemory: 2000, // Max items for in-memory fallback
-  transforms: [new LoggingHandler(customLogger)], // Opt-in logging
+  logger: customLogger, // Storage problems go here
+  transforms: [new LoggingHandler(customLogger)], // Opt-in: data flow
 });
 ```
 
@@ -564,6 +581,7 @@ const customStorage = getStorageSlice('CUSTOM', {
 | `debounceMs`       | `number`                                   | `100`       | Write debouncing delay (0 = immediate)              |
 | `maxSizeBytes`     | `number`                                   | `4_000_000` | Quota warning threshold (~4MB)                      |
 | `maxItemsInMemory` | `number`                                   | `1000`      | Max items for in-memory storage                     |
+| `logger`           | `StorageLogger`                            | `undefined` | Receives storage problems; silent without it        |
 | `transforms`       | `(TransformHandler \| StorageTransform)[]` | `undefined` | Handlers/objects wrapped into a chain               |
 | `transformChain`   | `TransformChain`                           | `undefined` | Pre-built chain; takes precedence over `transforms` |
 
@@ -571,9 +589,9 @@ const customStorage = getStorageSlice('CUSTOM', {
 > sets it from its own `sliceKey` argument, so you cannot pass it directly.
 > Its default when using `StorageVault` directly is `'APP_DATA'`.
 >
-> Logging and statistics are deliberately **not** options here — see
-> [Error Handling & Logging](#-error-handling--logging) and
-> [Stats & Debugging](#-stats--debugging).
+> Statistics are deliberately **not** an option here — see
+> [Stats & Debugging](#-stats--debugging). For logging, see
+> [Error Handling & Logging](#-error-handling--logging).
 
 ---
 
