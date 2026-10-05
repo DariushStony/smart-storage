@@ -233,6 +233,110 @@ describe('logger option: storage backend', () => {
   });
 });
 
+describe('logger option: a failing logger never breaks storage', () => {
+  const sessionDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'sessionStorage'
+  );
+
+  afterEach(() => {
+    if (sessionDescriptor) {
+      Object.defineProperty(globalThis, 'sessionStorage', sessionDescriptor);
+    }
+  });
+
+  function throwingLogger(): StorageLogger {
+    return {
+      log: () => {
+        throw new Error('logger exploded');
+      },
+    };
+  }
+
+  it('still writes a payload that exceeds maxSizeBytes', () => {
+    const { vault } = makeVault({
+      maxSizeBytes: 50,
+      logger: throwingLogger(),
+    });
+
+    expect(vault.setItem('k', 'x'.repeat(200))).toBe(true);
+    expect(vault.getItem('k')).toBe('x'.repeat(200));
+  });
+
+  it('still clears corrupted data and returns an empty slice', () => {
+    const { vault } = makeVault({
+      storageKey: 'LOG_THROWS_CORRUPT',
+      storageType: StorageType.Local,
+      logger: throwingLogger(),
+    });
+    localStorage.setItem('LOG_THROWS_CORRUPT', 'not json{{{');
+
+    expect(vault.getAll()).toEqual({});
+    expect(localStorage.getItem('LOG_THROWS_CORRUPT')).toBeNull();
+  });
+
+  it('still reports the storage error, not the logger error', () => {
+    const { vault } = makeVault({ logger: throwingLogger() });
+    vi.spyOn(vault.getStorageAdapter(), 'write').mockImplementation(() => {
+      throw new Error('disk on fire');
+    });
+
+    expect(() => vault.setItem('k', 'v')).toThrow(/failed to save/i);
+  });
+
+  it('still retries a quota breach after cleanup', () => {
+    vi.useFakeTimers();
+    const { vault } = makeVault({ logger: throwingLogger() });
+    vault.setItem('stale', 'x', 1000);
+    vi.advanceTimersByTime(1001);
+    const writeSpy = vi
+      .spyOn(vault.getStorageAdapter(), 'write')
+      .mockImplementationOnce(() => {
+        throw quotaError();
+      });
+
+    expect(() => vault.setItem('fresh', 'y')).not.toThrow();
+
+    // The first write threw, then cleanup ran and the write was retried.
+    expect(writeSpy.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('keeps pending data after a failed debounced save', () => {
+    vi.useFakeTimers();
+    const { vault } = makeVault({ debounceMs: 50, logger: throwingLogger() });
+    const writeSpy = vi
+      .spyOn(vault.getStorageAdapter(), 'write')
+      .mockImplementation(() => {
+        throw new Error('disk on fire');
+      });
+
+    vault.setItem('k', 'v');
+
+    expect(() => vi.advanceTimersByTime(60)).not.toThrow();
+    expect(vault.getItem('k')).toBe('v');
+
+    writeSpy.mockRestore();
+  });
+
+  it('still falls back to memory when web storage is blocked', () => {
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('denied', 'SecurityError');
+      },
+    });
+
+    const { vault } = makeVault({
+      storageType: StorageType.Session,
+      logger: throwingLogger(),
+    });
+
+    vault.setItem('k', 'v');
+    expect(vault.getItem('k')).toBe('v');
+    expect(vault.getStorageAdapter().getStorageType()).toBe('memory');
+  });
+});
+
 describe('logger option: identity and defaults', () => {
   it('is optional: nothing is logged or thrown without it', () => {
     counter += 1;

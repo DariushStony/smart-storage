@@ -105,7 +105,8 @@ low-level read/write, browser event management.
 Both are optional:
 
 - **Logging** — pass a `logger` option to hear about storage problems the vault
-  handles (corrupted data, quota, failed writes, blocked web storage). Add a
+  handles (corrupted data, quota, failed writes, web storage that is inaccessible at
+  startup). Add a
   `LoggingHandler` to the transform chain to also observe data flowing through
 - **Statistics** — construct a `StorageStatistics` on demand
 

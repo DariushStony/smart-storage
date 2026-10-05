@@ -1,3 +1,4 @@
+import { safeLog } from '../logger/safe-log.js';
 import type { StorageLogger } from '../logger/storage-logger.js';
 import { isWindowAvailable } from './environment.js';
 import type { IStorage } from './storage.interface.js';
@@ -20,7 +21,8 @@ class SessionStorage implements IStorage {
       try {
         this.storage = sessionStorage;
       } catch (e) {
-        this.logger?.log(
+        safeLog(
+          this.logger,
           'Web storage is not accessible. Falling back to in-memory storage.',
           e
         );

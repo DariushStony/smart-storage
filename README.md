@@ -522,8 +522,11 @@ describe('My tests', () => {
 
 Pass a `logger` to be told about every storage problem the vault handles:
 corrupted data being cleared, quota breaches and cleanups, failed writes, and
-web storage being blocked (the vault then falls back to memory). Without a
-logger the vault stays silent.
+web storage that cannot be accessed when the vault is created (it then falls
+back to memory; a later failed write throws instead). Without a logger the
+vault stays silent, and a logger that throws is ignored, so it can never break
+a storage operation. Messages and errors can mention storage keys and stored
+data, so filter them before forwarding to external telemetry.
 
 ```typescript
 import { getStorageSlice } from '@dariushstony/smart-storage';
