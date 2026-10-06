@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/DariushStony/smart-storage/compare/v1.1.2...v1.1.3) (2026-10-06)
+
+### Bug Fixes
+
+- make logger reporting best-effort ([6c984fb](https://github.com/DariushStony/smart-storage/commit/6c984fb71c1eb0216a8614f154a26ac42c85a625))
+- restore the logger option dropped in 1.1.0 ([3264ead](https://github.com/DariushStony/smart-storage/commit/3264eadc2b7e6406697c75b1e08f3f67fde499c8))
+
 ## [1.1.2](https://github.com/DariushStony/smart-storage/compare/v1.1.1...v1.1.2) (2026-08-10)
 
 ### Bug Fixes
