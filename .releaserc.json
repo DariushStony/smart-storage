@@ -4,7 +4,7 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
-    "@semantic-release/npm",
+    ["@semantic-release/npm", { "tarballDir": "pack" }],
     [
       "@semantic-release/git",
       {
@@ -17,8 +17,8 @@
       {
         "assets": [
           {
-            "path": "dist/**",
-            "label": "Distribution"
+            "path": "pack/*.tgz",
+            "label": "npm package"
           }
         ]
       }
