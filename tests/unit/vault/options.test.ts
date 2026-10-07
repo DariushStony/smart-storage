@@ -53,6 +53,26 @@ describe('resolveOptions', () => {
     });
   });
 
+  // Migrating code often spreads old options into createVault(); silently
+  // ignoring them would put session data in localStorage or skip codecs.
+  it.each([
+    ['storageType', 'driver'],
+    ['storageKey', 'key'],
+    ['maxSizeBytes', 'maxBytes'],
+    ['maxItemsInMemory', 'maxItems'],
+    ['logger', 'onError'],
+    ['transforms', 'codecs'],
+    ['transformChain', 'codecs'],
+  ])(
+    'rejects the 1.x option %s and names %s instead',
+    (legacy, replacement) => {
+      const options = { key: 'K', [legacy]: 'anything' } as VaultOptions;
+
+      expect(() => resolveOptions(options)).toThrow(StorageArgumentError);
+      expect(() => resolveOptions(options)).toThrow(replacement);
+    }
+  );
+
   it.each([
     ['no options', undefined],
     ['null', null],
