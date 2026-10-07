@@ -1,0 +1,15 @@
+{
+  // Type-checks tests/types/consumer.ts against the built package (dist/),
+  // with skipLibCheck off, as a strict consumer would. Run after `pnpm build`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": ["tests/types/consumer.ts"]
+}

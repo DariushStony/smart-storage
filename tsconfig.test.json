@@ -10,5 +10,7 @@
     "types": ["node"],
     "rootDir": "."
   },
-  "include": ["tests", "vitest.config.ts", "playwright.config.ts"]
+  "include": ["tests", "vitest.config.ts", "playwright.config.ts"],
+  // Checked against dist/ by tsconfig.consumer.json instead.
+  "exclude": ["tests/types"]
 }

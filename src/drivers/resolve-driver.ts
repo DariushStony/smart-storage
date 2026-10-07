@@ -52,7 +52,7 @@ function resolveWebStorage(kind: WebKind): Resolution {
   }
 }
 
-/** @internal Test hook: forget shared drivers so environment changes are seen. */
+/** Test hook: forget shared drivers so environment changes are seen. Not exported from the package. */
 function resetSharedDrivers(): void {
   shared = {};
 }
