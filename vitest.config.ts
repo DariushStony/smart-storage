@@ -6,6 +6,11 @@ export default defineConfig({
     // without a real browser. Genuine persistence across reloads, real quota
     // limits and pagehide are covered by the Playwright suite in tests/e2e.
     environment: 'happy-dom',
+    // Node >= 25 ships a built-in localStorage global that shadows happy-dom's.
+    execArgv:
+      Number(process.versions.node.split('.')[0]) >= 25
+        ? ['--no-experimental-webstorage']
+        : [],
     include: ['tests/unit/**/*.test.ts'],
     // tests/e2e is driven by Playwright, not Vitest.
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
