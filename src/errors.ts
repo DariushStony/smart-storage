@@ -13,6 +13,11 @@ interface StorageErrorOptions {
   cause?: unknown;
 }
 
+interface StorageQuotaErrorOptions extends StorageErrorOptions {
+  bytes?: number;
+  maxBytes?: number;
+}
+
 /**
  * Base class for every error the library throws or reports.
  * Branch on `code` or on the subclass. `name` is set explicitly so it
@@ -44,9 +49,16 @@ class StorageArgumentError extends StorageError {
 
 /** The data does not fit `maxBytes` or the browser quota. Thrown, or reported for deferred writes. */
 class StorageQuotaError extends StorageError {
-  constructor(message: string, options?: StorageErrorOptions) {
+  /** UTF-8 size of the string the write tried to store, when known. */
+  readonly bytes: number | undefined;
+  /** The vault's `maxBytes` when that was the limit hit; undefined for the browser quota. */
+  readonly maxBytes: number | undefined;
+
+  constructor(message: string, options: StorageQuotaErrorOptions = {}) {
     super('QUOTA_EXCEEDED', message, options);
     this.name = 'StorageQuotaError';
+    this.bytes = options.bytes;
+    this.maxBytes = options.maxBytes;
   }
 }
 
@@ -116,4 +128,4 @@ export {
   StorageConflictError,
   toStorageError,
 };
-export type { StorageErrorCode, StorageErrorOptions };
+export type { StorageErrorCode, StorageErrorOptions, StorageQuotaErrorOptions };

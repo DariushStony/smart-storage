@@ -61,7 +61,8 @@ class SnapshotRepository {
     // never be shrunk.
     if (bytes > this.maxBytes && bytes > this.storedBytes()) {
       throw new StorageQuotaError(
-        `"${this.key}" would be ${String(bytes)} bytes, over its ${String(this.maxBytes)}-byte limit.`
+        `"${this.key}" would be ${String(bytes)} bytes, over its ${String(this.maxBytes)}-byte limit.`,
+        { bytes, maxBytes: this.maxBytes }
       );
     }
 
@@ -71,7 +72,7 @@ class SnapshotRepository {
       if (isQuotaError(error)) {
         throw new StorageQuotaError(
           `The browser's storage quota is full; "${this.key}" was not saved.`,
-          { cause: error }
+          { cause: error, bytes }
         );
       }
       throw new StorageAccessError(`Writing "${this.key}" failed.`, {

@@ -153,6 +153,43 @@ describe('SnapshotRepository.save', () => {
     expect(repository.load().get('b', 0)).toBeUndefined();
   });
 
+  it('tells the caller how big the write was and what the limit is', () => {
+    const { repository } = setup({ maxBytes: 80 });
+    const big = Snapshot.empty.with('b', entry('x'.repeat(100)));
+
+    let caught: unknown;
+    try {
+      repository.save(big);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(StorageQuotaError);
+    expect((caught as StorageQuotaError).bytes).toBe(
+      utf8ByteLength(encodeEnvelope(big))
+    );
+    expect((caught as StorageQuotaError).maxBytes).toBe(80);
+  });
+
+  it('reports the attempted size when the browser quota is hit', () => {
+    const { repository, driver } = setup();
+    vi.spyOn(driver, 'write').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+
+    let caught: unknown;
+    try {
+      repository.save(Snapshot.empty);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect((caught as StorageQuotaError).bytes).toBe(
+      utf8ByteLength(encodeEnvelope(Snapshot.empty))
+    );
+    expect((caught as StorageQuotaError).maxBytes).toBeUndefined();
+  });
+
   // Data can already be over the limit: written by 1.x (which only logged),
   // by a vault with a higher limit, or before maxBytes was lowered.
   it('lets a write through that does not grow data already over maxBytes', () => {

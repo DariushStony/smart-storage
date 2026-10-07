@@ -137,6 +137,10 @@ the caller or **reported** to `onError`, never both.
 | `StorageUnavailableError`   | `UNAVAILABLE`      | Reported: Web Storage is blocked, so the vault uses memory.       |
 | `StorageConflictError`      | `CONFLICT`         | Reported: a newer vault took over the same key.                   |
 
+`StorageQuotaError` also carries `bytes` (the size the write tried to store)
+and `maxBytes` (the vault's limit, when that was the limit hit; `undefined`
+for the browser's own quota).
+
 With `debounceMs > 0`, write failures happen later, on a timer, so they are
 **reported**; `flush()` throws them.
 

@@ -34,4 +34,8 @@ export type { Codec } from './codec/codec.js';
 export type { StorageDriver } from './drivers/storage-driver.js';
 export type { DriverSpec } from './drivers/resolve-driver.js';
 export type { WebStorageLike } from './drivers/web-storage-driver.js';
-export type { StorageErrorCode, StorageErrorOptions } from './errors.js';
+export type {
+  StorageErrorCode,
+  StorageErrorOptions,
+  StorageQuotaErrorOptions,
+} from './errors.js';

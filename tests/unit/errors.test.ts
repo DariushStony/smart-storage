@@ -38,6 +38,14 @@ describe('StorageError hierarchy', () => {
     expect(new StorageQuotaError('full', { cause }).cause).toBe(cause);
   });
 
+  it('carries the attempted size and the limit on StorageQuotaError', () => {
+    const error = new StorageQuotaError('full', { bytes: 120, maxBytes: 100 });
+
+    expect(error.bytes).toBe(120);
+    expect(error.maxBytes).toBe(100);
+    expect(new StorageQuotaError('full').bytes).toBeUndefined();
+  });
+
   it('has no cause when none was given', () => {
     expect(new StorageQuotaError('full').cause).toBeUndefined();
   });
