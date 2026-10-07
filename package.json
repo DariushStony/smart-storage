@@ -13,7 +13,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "A robust, SSR-safe, production-ready wrapper around Web Storage (localStorage/sessionStorage) with TTL, transforms, debouncing, and automatic cleanup",
+  "description": "A typed, SSR-safe vault over localStorage, sessionStorage or memory with TTL, codecs, optional debounced writes and typed errors",
   "keywords": [
     "storage",
     "localStorage",
@@ -24,7 +24,7 @@
     "browser-storage",
     "ssr-safe",
     "typescript",
-    "transform",
+    "codec",
     "debounce",
     "expiration"
   ],
@@ -57,6 +57,7 @@
     "analyze": "size-limit --why",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "typecheck:dist": "tsc -p tsconfig.consumer.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

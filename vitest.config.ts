@@ -6,6 +6,11 @@ export default defineConfig({
     // without a real browser. Genuine persistence across reloads, real quota
     // limits and pagehide are covered by the Playwright suite in tests/e2e.
     environment: 'happy-dom',
+    // Node >= 25 ships a built-in localStorage global that shadows happy-dom's.
+    execArgv:
+      Number(process.versions.node.split('.')[0]) >= 25
+        ? ['--no-experimental-webstorage']
+        : [],
     include: ['tests/unit/**/*.test.ts'],
     // tests/e2e is driven by Playwright, not Vitest.
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
@@ -14,14 +19,12 @@ export default defineConfig({
     unstubGlobals: true,
     coverage: {
       provider: 'v8',
-      // Reported, not gated -- see CONTRIBUTING. Add thresholds once the
-      // numbers have settled rather than picking one up front.
+      // Enforced: the rewrite is fully covered, and must stay that way.
+      thresholds: { lines: 95, functions: 95, statements: 95, branches: 90 },
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      // Barrel files only. Note `src/**/index.ts` would ALSO match
-      // `src/index.ts`, which is not a barrel -- it holds getStorageSlice()
-      // and disposeStorageSlice() and must stay measured.
-      exclude: ['src/*/index.ts'],
+      // Type-only modules have no runtime code to measure.
+      exclude: ['src/drivers/storage-driver.ts', 'src/vault/vault.ts'],
     },
   },
 });

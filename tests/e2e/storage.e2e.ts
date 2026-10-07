@@ -1,41 +1,54 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * End-to-end specs against a real Chromium and the built bundle.
  *
- * Scope is deliberately narrow: only behavior that a simulated DOM cannot
- * honestly prove. Logic, TTL arithmetic, transforms and singleton semantics
- * are covered far faster by the Vitest suite in tests/unit.
+ * Scope is deliberately narrow: only behaviour a simulated DOM cannot prove
+ * honestly. Logic, TTL arithmetic, codecs and the registry are covered far
+ * faster by the Vitest suite in tests/unit.
  */
 
 const HARNESS = '/tests/e2e/harness.html';
 
-test.beforeEach(async ({ page }) => {
+async function open(page: Page): Promise<void> {
   await page.goto(HARNESS);
   await page.waitForFunction(() => window.__smartStorageReady === true);
+}
+
+async function reload(page: Page): Promise<void> {
+  await page.reload();
+  await page.waitForFunction(() => window.__smartStorageReady === true);
+}
+
+test.beforeEach(async ({ page }) => {
+  await open(page);
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
 });
 
-test.describe('the shipped bundle loads in a real browser', () => {
-  test('exposes the documented exports', async ({ page }) => {
+test.describe('the shipped bundle', () => {
+  test('exposes exactly the documented runtime exports', async ({ page }) => {
     const exports = await page.evaluate(() =>
       Object.keys(window.smartStorage).sort()
     );
 
     expect(exports).toEqual(
       [
-        'InlineTransformHandler',
-        'LoggingHandler',
-        'StorageStatistics',
-        'StorageType',
-        'StorageVault',
-        'TransformChain',
-        'TransformHandler',
-        'disposeStorageSlice',
-        'getStorageSlice',
+        'MemoryDriver',
+        'StorageAccessError',
+        'StorageArgumentError',
+        'StorageConflictError',
+        'StorageCorruptionError',
+        'StorageDisposedError',
+        'StorageError',
+        'StorageQuotaError',
+        'StorageSerializationError',
+        'StorageUnavailableError',
+        'WebStorageDriver',
+        'createVault',
       ].sort()
     );
   });
@@ -44,91 +57,97 @@ test.describe('the shipped bundle loads in a real browser', () => {
 test.describe('real localStorage persistence', () => {
   test('data survives a full page reload', async ({ page }) => {
     await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_PERSIST', { debounceMs: 0 });
-      storage.setItem('theme', 'dark');
+      window.smartStorage
+        .createVault({ key: 'E2E_PERSIST' })
+        .set('theme', 'dark');
     });
 
-    await page.reload();
-    await page.waitForFunction(() => window.__smartStorageReady === true);
+    await reload(page);
 
-    const theme = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      // A brand new JS realm: this can only pass if the bytes really persisted.
-      return getStorageSlice('E2E_PERSIST').getItem('theme');
-    });
-
+    const theme = await page.evaluate(() =>
+      // A brand new JS realm: this only passes if the bytes really persisted.
+      window.smartStorage.createVault({ key: 'E2E_PERSIST' }).get('theme')
+    );
     expect(theme).toBe('dark');
   });
 
-  test('writes land under the slice key as a single JSON blob', async ({
-    page,
-  }) => {
+  test('a vault writes one versioned blob under its key', async ({ page }) => {
     const raw = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_BLOB', { debounceMs: 0 });
-      storage.setItem('a', 1);
-      storage.setItem('b', { nested: true });
+      const vault = window.smartStorage.createVault({ key: 'E2E_BLOB' });
+      vault.set('a', 1);
+      vault.set('b', { nested: true });
       return localStorage.getItem('E2E_BLOB');
     });
 
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw ?? '{}');
-    expect(Object.keys(parsed).sort()).toEqual(['a', 'b']);
-    expect(parsed.a).toEqual({ value: 1, expiry: null });
-  });
-
-  test('separate slices occupy separate storage keys', async ({ page }) => {
-    const keys = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      getStorageSlice('E2E_ONE', { debounceMs: 0 }).setItem('k', 'one');
-      getStorageSlice('E2E_TWO', { debounceMs: 0 }).setItem('k', 'two');
-      return Object.keys(localStorage).sort();
+    expect(JSON.parse(raw ?? 'null')).toEqual({
+      v: 2,
+      items: [
+        { key: 'a', value: 1 },
+        { key: 'b', value: { nested: true } },
+      ],
     });
-
-    expect(keys).toEqual(['E2E_ONE', 'E2E_TWO']);
   });
 
   test('an expired item is gone after a reload', async ({ page }) => {
     await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_TTL', { debounceMs: 0 });
-      storage.setItem('vanishing', 'v', 300);
-      storage.setItem('surviving', 'v');
+      const vault = window.smartStorage.createVault({ key: 'E2E_TTL' });
+      vault.set('vanishing', 'v', { ttl: 300 });
+      vault.set('surviving', 'v');
     });
 
     // Real elapsed time, not a mocked clock.
-    await new Promise((r) => setTimeout(r, 400));
-    await page.reload();
-    await page.waitForFunction(() => window.__smartStorageReady === true);
+    await page.waitForTimeout(400);
+    await reload(page);
 
     const result = await page.evaluate(() => {
-      const storage = window.smartStorage.getStorageSlice('E2E_TTL', {
-        debounceMs: 0,
-      });
+      const vault = window.smartStorage.createVault({ key: 'E2E_TTL' });
       return {
-        vanishing: storage.getItem('vanishing'),
-        surviving: storage.getItem('surviving'),
+        vanishing: vault.get('vanishing'),
+        surviving: vault.get('surviving'),
+      };
+    });
+    expect(result).toEqual({ vanishing: null, surviving: 'v' });
+  });
+
+  test('data written by 1.x is read and upgraded on the next write', async ({
+    page,
+  }) => {
+    const result = await page.evaluate(() => {
+      localStorage.setItem(
+        'E2E_LEGACY',
+        JSON.stringify({
+          theme: { value: 'dark', expiry: null },
+          token: { value: 'abc', expiry: Date.now() + 60_000 },
+        })
+      );
+      const vault = window.smartStorage.createVault({ key: 'E2E_LEGACY' });
+      const before = { theme: vault.get('theme'), token: vault.get('token') };
+      vault.set('lang', 'fa');
+      const raw = JSON.parse(localStorage.getItem('E2E_LEGACY') ?? 'null') as {
+        v: number;
+        items: Array<{ key: string }>;
+      };
+      return {
+        before,
+        version: raw.v,
+        keys: raw.items.map((item) => item.key),
       };
     });
 
-    expect(result.vanishing).toBeNull();
-    expect(result.surviving).toBe('v');
+    expect(result.before).toEqual({ theme: 'dark', token: 'abc' });
+    expect(result.version).toBe(2);
+    expect(result.keys).toEqual(['theme', 'token', 'lang']);
   });
 });
 
 test.describe('sessionStorage semantics', () => {
-  test('session data is written to sessionStorage, not localStorage', async ({
+  test('session data goes to sessionStorage, not localStorage', async ({
     page,
   }) => {
     const stores = await page.evaluate(() => {
-      const { getStorageSlice, StorageType } = window.smartStorage;
-      const session = getStorageSlice('E2E_SESSION', {
-        storageType: StorageType.Session,
-        debounceMs: 0,
-      });
-      session.setItem('step', 2);
-
+      window.smartStorage
+        .createVault({ key: 'E2E_SESSION', driver: 'session' })
+        .set('step', 2);
       return {
         session: sessionStorage.getItem('E2E_SESSION'),
         local: localStorage.getItem('E2E_SESSION'),
@@ -144,38 +163,29 @@ test.describe('sessionStorage semantics', () => {
     browser,
   }) => {
     await page.evaluate(() => {
-      const { getStorageSlice, StorageType } = window.smartStorage;
-      getStorageSlice('E2E_SESSION_LIFE', {
-        storageType: StorageType.Session,
-        debounceMs: 0,
-      }).setItem('k', 'v');
+      window.smartStorage
+        .createVault({ key: 'E2E_SESSION_LIFE', driver: 'session' })
+        .set('k', 'v');
     });
 
-    await page.reload();
-    await page.waitForFunction(() => window.__smartStorageReady === true);
-
-    const afterReload = await page.evaluate(() => {
-      const { getStorageSlice, StorageType } = window.smartStorage;
-      return getStorageSlice('E2E_SESSION_LIFE', {
-        storageType: StorageType.Session,
-      }).getItem('k');
-    });
+    await reload(page);
+    const afterReload = await page.evaluate(() =>
+      window.smartStorage
+        .createVault({ key: 'E2E_SESSION_LIFE', driver: 'session' })
+        .get('k')
+    );
     expect(afterReload).toBe('v');
 
     // A fresh context is a fresh browsing session, so sessionStorage is empty.
     const freshContext = await browser.newContext();
     const freshPage = await freshContext.newPage();
-    await freshPage.goto(HARNESS);
-    await freshPage.waitForFunction(() => window.__smartStorageReady === true);
-
-    const inFreshSession = await freshPage.evaluate(() => {
-      const { getStorageSlice, StorageType } = window.smartStorage;
-      return getStorageSlice('E2E_SESSION_LIFE', {
-        storageType: StorageType.Session,
-      }).getItem('k');
-    });
+    await open(freshPage);
+    const inFreshSession = await freshPage.evaluate(() =>
+      window.smartStorage
+        .createVault({ key: 'E2E_SESSION_LIFE', driver: 'session' })
+        .get('k')
+    );
     expect(inFreshSession).toBeNull();
-
     await freshContext.close();
   });
 });
@@ -185,27 +195,25 @@ test.describe('debounced writes against a real event loop', () => {
     page,
   }) => {
     const observed = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_DEBOUNCE', { debounceMs: 1000 });
-      storage.setItem('k', 'v');
-
+      const vault = window.smartStorage.createVault({
+        key: 'E2E_DEBOUNCE',
+        debounceMs: 1000,
+      });
+      vault.set('k', 'v');
       return {
-        readBack: storage.getItem('k'),
+        readBack: vault.get('k'),
         persisted: localStorage.getItem('E2E_DEBOUNCE'),
       };
     });
 
-    expect(observed.readBack).toBe('v');
-    expect(observed.persisted).toBeNull();
+    expect(observed).toEqual({ readBack: 'v', persisted: null });
   });
 
-  test('a pending write persists once the window elapses', async ({ page }) => {
+  test('a pending write persists once the delay elapses', async ({ page }) => {
     await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      getStorageSlice('E2E_DEBOUNCE_WAIT', { debounceMs: 150 }).setItem(
-        'k',
-        'v'
-      );
+      window.smartStorage
+        .createVault({ key: 'E2E_DEBOUNCE_WAIT', debounceMs: 150 })
+        .set('k', 'v');
     });
 
     await expect
@@ -216,146 +224,97 @@ test.describe('debounced writes against a real event loop', () => {
       .not.toBeNull();
   });
 
-  test('flush() persists synchronously', async ({ page }) => {
-    const persisted = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_FLUSH', { debounceMs: 10_000 });
-      storage.setItem('k', 'v');
-      storage.flush();
-      return localStorage.getItem('E2E_FLUSH');
-    });
-
-    expect(persisted).toContain('"v"');
-  });
-});
-
-test.describe('pagehide auto-flush', () => {
   test('a pending write is not lost when the page is navigated away', async ({
     page,
   }) => {
     await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      // Long debounce: without a pagehide flush this write would be lost.
-      getStorageSlice('E2E_PAGEHIDE', { debounceMs: 60_000 }).setItem(
-        'k',
-        'survives'
-      );
+      // Long delay: without the pagehide flush this write would be lost.
+      window.smartStorage
+        .createVault({ key: 'E2E_PAGEHIDE', debounceMs: 60_000 })
+        .set('k', 'survives');
     });
 
-    // A real navigation, which fires a real pagehide event.
-    await page.goto(HARNESS);
-    await page.waitForFunction(() => window.__smartStorageReady === true);
+    // A real navigation fires a real pagehide event.
+    await open(page);
 
     const raw = await page.evaluate(() => localStorage.getItem('E2E_PAGEHIDE'));
-
     expect(raw).toContain('survives');
   });
 });
 
-test.describe('large payloads', () => {
+test.describe('real quota', () => {
   test.slow();
 
-  // This spec does NOT assert that every write survives, because today it does
-  // not: on quota exhaustion the vault silently drops the new item and returns
-  // true. See the `it.fails` case in tests/unit/storage-vault.test.ts under
-  // "KNOWN DEFECT" for the deterministic reproduction and the desired
-  // behaviour. Asserting the correct outcome here would just pin CI red on a
-  // pre-existing bug that this branch does not attempt to fix.
-  //
-  // What it does assert is the weaker invariant that holds regardless: values
-  // the vault reports as present must read back byte-for-byte, and the page
-  // must survive. That still catches corruption and partial writes.
-  test('values that survive a large write are intact, and the page survives', async ({
+  test('a write past the quota throws StorageQuotaError and keeps earlier data', async ({
     page,
   }) => {
-    const CHUNKS = 20;
-    const CHUNK_CHARS = 512 * 1024;
-
     const outcome = await page.evaluate(
       ({ chunks, chunkChars }) => {
-        const { getStorageSlice } = window.smartStorage;
-        const storage = getStorageSlice('E2E_LARGE', { debounceMs: 0 });
+        const { createVault, StorageQuotaError } = window.smartStorage;
+        const vault = createVault({
+          key: 'E2E_QUOTA',
+          maxBytes: Number.MAX_SAFE_INTEGER,
+        });
         const chunk = 'x'.repeat(chunkChars);
+        const accepted: string[] = [];
 
         for (let i = 0; i < chunks; i += 1) {
+          const key = `chunk-${String(i)}`;
           try {
-            storage.setItem(`chunk-${String(i)}`, chunk);
+            vault.set(key, chunk);
+            accepted.push(key);
           } catch (error) {
+            const present = vault.keys();
             return {
-              threw: true,
-              written: i,
-              message: error instanceof Error ? error.message : String(error),
-              lastLength: -1,
-              keyCount: -1,
+              quotaError: error instanceof StorageQuotaError,
+              accepted,
+              present,
+              intact: present.every(
+                (k) => (vault.get<string>(k) ?? '').length === chunkChars
+              ),
             };
           }
         }
-
-        // Every key the vault still reports must hold its full payload. A
-        // partially-written or corrupted value would show up as a short read.
-        const present = storage.getAllKeys();
-        const shortReads = present.filter(
-          (key) => (storage.getItem<string>(key) ?? '').length !== chunkChars
-        );
-
         return {
-          threw: false,
-          written: chunks,
-          message: '',
-          presentCount: present.length,
-          shortReads,
+          quotaError: false,
+          accepted,
+          present: vault.keys(),
+          intact: true,
         };
       },
-      { chunks: CHUNKS, chunkChars: CHUNK_CHARS }
+      { chunks: 40, chunkChars: 512 * 1024 }
     );
 
-    if (outcome.threw) {
-      // Failing loudly is fine, but it must be the vault's own descriptive
-      // error rather than a leaked raw DOMException.
-      expect(outcome.message).toMatch(/quota|storage/i);
-    } else {
-      // At least the earliest writes must have landed, and nothing that is
-      // present may be truncated or corrupted.
-      expect(outcome.presentCount).toBeGreaterThan(0);
-      expect(outcome.shortReads).toEqual([]);
-    }
-
-    // Either way the page must still be alive and a fresh slice usable.
-    const stillWorks = await page.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      const fresh = getStorageSlice('E2E_LARGE_AFTER', { debounceMs: 0 });
-      fresh.clear();
-      fresh.setItem('k', 'v');
-      return fresh.getItem('k');
-    });
-
-    expect(stillWorks).toBe('v');
+    expect(outcome.quotaError).toBe(true);
+    expect(outcome.accepted.length).toBeGreaterThan(0);
+    // Every write that returned normally is still there; nothing was dropped.
+    expect(outcome.present).toEqual(outcome.accepted);
+    expect(outcome.intact).toBe(true);
   });
 });
 
-test.describe('cross-tab visibility', () => {
-  test('a second tab sees data written by the first', async ({ context }) => {
+test.describe('across tabs', () => {
+  test('an open vault sees writes another tab makes later', async ({
+    context,
+  }) => {
     const first = await context.newPage();
-    await first.goto(HARNESS);
-    await first.waitForFunction(() => window.__smartStorageReady === true);
-    await first.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      getStorageSlice('E2E_CROSS_TAB', { debounceMs: 0 }).setItem(
-        'shared',
-        'from-tab-1'
-      );
-    });
-
     const second = await context.newPage();
-    await second.goto(HARNESS);
-    await second.waitForFunction(() => window.__smartStorageReady === true);
+    await open(first);
+    await open(second);
 
-    const seen = await second.evaluate(() => {
-      const { getStorageSlice } = window.smartStorage;
-      // localStorage is shared per origin, so a separate tab reads it.
-      return getStorageSlice('E2E_CROSS_TAB').getItem('shared');
+    await second.evaluate(() => {
+      window.__vault = window.smartStorage.createVault({
+        key: 'E2E_CROSS_TAB',
+      });
+      window.__vault.get('shared');
+    });
+    await first.evaluate(() => {
+      window.smartStorage
+        .createVault({ key: 'E2E_CROSS_TAB' })
+        .set('shared', 'from-tab-1');
     });
 
+    const seen = await second.evaluate(() => window.__vault?.get('shared'));
     expect(seen).toBe('from-tab-1');
 
     await first.close();
@@ -363,23 +322,28 @@ test.describe('cross-tab visibility', () => {
   });
 });
 
-test.describe('corrupted storage recovery in a real browser', () => {
-  test('a garbage payload is discarded rather than thrown', async ({
+test.describe('corrupted storage in a real browser', () => {
+  test('a garbage payload reads as empty, stays until a write, then is replaced', async ({
     page,
   }) => {
     const result = await page.evaluate(() => {
       localStorage.setItem('E2E_CORRUPT', 'not json at all }{');
+      const errors: string[] = [];
+      const vault = window.smartStorage.createVault({
+        key: 'E2E_CORRUPT',
+        onError: (error) => errors.push(error.code),
+      });
 
-      const { getStorageSlice } = window.smartStorage;
-      const storage = getStorageSlice('E2E_CORRUPT', { debounceMs: 0 });
+      const before = vault.toObject();
+      const untouched = localStorage.getItem('E2E_CORRUPT');
+      vault.set('k', 'recovered');
 
-      const all = storage.getAll();
-      storage.setItem('k', 'recovered');
-
-      return { all, afterWrite: storage.getItem('k') };
+      return { before, untouched, errors, after: vault.get('k') };
     });
 
-    expect(result.all).toEqual({});
-    expect(result.afterWrite).toBe('recovered');
+    expect(result.before).toEqual({});
+    expect(result.untouched).toBe('not json at all }{');
+    expect(result.errors).toEqual(['CORRUPTED']);
+    expect(result.after).toBe('recovered');
   });
 });

@@ -11,5 +11,7 @@ declare global {
     smartStorage: typeof SmartStorage;
     /** Set once the harness module has finished evaluating. */
     __smartStorageReady?: boolean;
+    /** Lets a spec keep one vault alive across several evaluate() calls. */
+    __vault?: SmartStorage.Vault;
   }
 }

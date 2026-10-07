@@ -164,6 +164,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Compiles a sample consumer against dist/ with skipLibCheck off, so a
+      # broken published .d.ts fails CI instead of a user's build.
+      - run: pnpm typecheck:dist
       - run: pnpm size:check
 
       - uses: actions/upload-artifact@v7
