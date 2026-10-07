@@ -129,7 +129,7 @@ pnpm analyze        # Analyze bundle composition
    ```bash
    git commit -m "feat!: change API signature
 
-   BREAKING CHANGE: getStorageSlice now requires options parameter"
+   BREAKING CHANGE: createVault now requires a key option"
    ```
 
 5. **Push your changes**
@@ -187,9 +187,9 @@ source files are `.ts`. Declarations are emitted by `tsc`, and extensionless
 specifiers break consumers using `node16`/`nodenext` module resolution.
 
 ```typescript
-import type { StorageTypeValue, StorageLogger } from './types.js';
-import { DEFAULT_DEBOUNCE_MS } from './constants.js';
-import { validateKey, isExpired } from './helpers.js';
+import type { Entry } from './entry.js';
+import { Snapshot } from './snapshot.js';
+import { StorageArgumentError } from '../errors.js';
 ```
 
 ## 🧪 Testing
@@ -200,12 +200,9 @@ New behavior needs tests, and bug fixes need a test that fails before the fix.
 
 ```text
 tests/
-├── unit/           # Vitest + happy-dom -- fast, covers all logic
-│   ├── helpers.test.ts
-│   ├── transform.test.ts
-│   ├── storage.test.ts
-│   ├── storage-vault.test.ts
-│   ├── statistics.test.ts
+├── unit/           # Vitest + happy-dom -- fast, covers all logic; mirrors src/
+│   ├── core/  codec/  drivers/  persistence/  reporting/  vault/
+│   ├── errors.test.ts
 │   └── public-api.test.ts
 └── e2e/            # Playwright + real Chromium
     ├── harness.html      # loads the built bundle
@@ -221,9 +218,9 @@ prove the behavior:
 | Use unit tests for                     | Use e2e tests for                      |
 | -------------------------------------- | -------------------------------------- |
 | TTL arithmetic, expiry, cleanup        | Persistence across a real page reload  |
-| Transform chain ordering               | `sessionStorage` clearing with the tab |
-| Singleton identity, disposal           | Real `pagehide` flushing               |
-| Key validation, prototype-pollution    | Genuine quota pressure                 |
+| Codec ordering, envelope decoding      | `sessionStorage` clearing with the tab |
+| Registry takeover, disposal            | Real `pagehide` flushing               |
+| Key validation, prototype-like keys    | Genuine quota pressure                 |
 | Debounce coalescing (with fake timers) | Cross-tab visibility                   |
 
 E2E specs run against `dist/`, so they verify the **shipped artifact**;
@@ -231,42 +228,46 @@ E2E specs run against `dist/`, so they verify the **shipped artifact**;
 
 ### Writing a unit test
 
-Vaults are singletons, so isolate each test with a unique slice key and clear
-the cache afterwards:
+Give each test its own `MemoryDriver` (or a unique key) so vaults never share
+state, and dispose what you create:
 
 ```typescript
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { StorageType } from '../../src/storage/storage-type.js';
-import { StorageVault } from '../../src/vault/storage-vault.js';
+import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
+import { createVault } from '../../../src/vault/create-vault.js';
+import type { Vault } from '../../../src/vault/vault.js';
+
+const created: Vault[] = [];
 
 afterEach(() => {
-  StorageVault.clearAllInstances();
+  created.splice(0).forEach((vault) => vault.dispose());
 });
 
-describe('StorageVault', () => {
+describe('Vault', () => {
   it('stores and retrieves data', () => {
-    const vault = StorageVault.getInstance({
-      storageKey: 'TEST_UNIQUE_KEY',
-      storageType: StorageType.InMemory, // isolated, no real storage
-      debounceMs: 0, // observe writes synchronously
-    });
+    const vault = createVault({ key: 'TEST', driver: new MemoryDriver() });
+    created.push(vault);
 
-    vault.setItem('key', 'value');
+    vault.set('key', 'value');
 
-    expect(vault.getItem('key')).toBe('value');
+    expect(vault.get('key')).toBe('value');
   });
 });
 ```
+
+Writes are immediate by default, so assertions see them synchronously. Unit
+tests run with `--no-experimental-webstorage` on Node >= 25 (set in
+`vitest.config.ts`), because Node's own `localStorage` global would otherwise
+shadow happy-dom's.
 
 Use `vi.useFakeTimers()` for anything involving TTL or debouncing rather than
 sleeping in real time.
 
 ### Coverage
 
-`pnpm test:coverage` prints a report. There is deliberately **no threshold
-gate** — add one once the numbers have settled rather than picking a figure up
-front.
+`pnpm test:coverage` prints a report and enforces the thresholds in
+`vitest.config.ts`; CI fails when coverage drops below them.
 
 ## 📚 Documentation
 
@@ -280,19 +281,18 @@ When adding or changing features:
 
 ````typescript
 /**
- * Stores a value with an optional TTL (time-to-live).
+ * Replaces the value and keeps the expiry.
  *
- * @param key - The key to store the value under
- * @param value - The value to store (will be JSON serialized)
- * @param ttl - Optional time-to-live in milliseconds
- * @returns True if stored successfully, false otherwise
+ * @param key - The item's key
+ * @param value - The new value (round-trips through JSON)
+ * @returns False when the item is missing or expired
  *
  * @example
  * ```typescript
- * vault.setItem('token', 'abc123', 60 * 60 * 1000); // 1 hour TTL
+ * vault.update('token', 'refreshed');
  * ```
  */
-function setItem(key: string, value: unknown, ttl?: number): boolean {
+function update<T>(key: string, value: T): boolean {
   // Implementation
 }
 ````
@@ -368,33 +368,36 @@ All submissions require review. We use GitHub Pull Requests for this:
 
 ```text
 src/
-├── vault/                      # Core implementation
-│   ├── storage-vault.ts        # Main StorageVault class
-│   ├── helpers.ts              # Validation and expiry helpers
-│   ├── constants.ts            # Defaults and dangerous-key list
-│   └── types.ts                # StorageVaultOptions, StorageStats, ...
-├── storage/                    # Storage backends
-│   ├── storage.interface.ts    # IStorage contract
-│   ├── storage.factory.ts      # Backend selection
-│   ├── storage-type.ts         # StorageType constants
-│   ├── local-storage.ts        # localStorage adapter
-│   ├── session-storage.ts      # sessionStorage adapter
-│   ├── in-memory-storage.ts    # Map adapter (SSR/testing)
-│   └── environment.ts          # SSR detection
-├── transform/                  # Transform chain
-│   ├── transform-chain.ts      # Chain of Responsibility
-│   ├── transform-handler.ts    # Base handler class
-│   ├── inline-transform-handler.ts
-│   └── types.ts                # StorageTransform
-├── logger/                     # Pluggable logging
-│   ├── storage-logger.ts       # StorageLogger interface
-│   └── logging-handler.ts      # Logging as a chain handler
-├── statistics/                 # Pluggable statistics
-│   └── storage-statistics.ts   # StorageStatistics
-└── index.ts                    # Public API
+├── index.ts                    # Public API (the only entry point)
+├── errors.ts                   # StorageError hierarchy
+├── core/                       # Pure domain, no I/O
+│   ├── entry.ts                # Entry (JSON text + expiresAt), TTL helpers
+│   ├── snapshot.ts             # Immutable snapshot, compaction
+│   ├── envelope.ts             # On-disk format v2, reads 1.x
+│   ├── validation.ts           # Argument checks
+│   └── byte-size.ts            # UTF-8 length
+├── codec/codec.ts              # Codec interface, composeCodecs
+├── drivers/                    # Port + adapters
+│   ├── storage-driver.ts       # StorageDriver port
+│   ├── web-storage-driver.ts   # localStorage / sessionStorage adapter
+│   ├── memory-driver.ts        # Map adapter (SSR, tests)
+│   └── resolve-driver.ts       # 'local' | 'session' | 'memory' → driver
+├── persistence/
+│   ├── snapshot-serializer.ts  # Snapshot ↔ string (envelope + codecs)
+│   ├── snapshot-repository.ts  # Load/save via a driver, quota handling
+│   ├── write-strategy.ts       # Immediate / debounced writes
+│   └── page-lifecycle.ts       # pagehide / visibilitychange
+├── reporting/reporter.ts       # Safe onError wrapper
+└── vault/
+    ├── vault.ts                # Public Vault interface and option types
+    ├── options.ts              # Defaults and option validation
+    ├── default-vault.ts        # The Vault facade
+    ├── registry.ts             # One live vault per storage key
+    └── create-vault.ts         # Composition root
 ```
 
-Each folder has an `index.ts` barrel file re-exporting its public pieces.
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for how the layers fit
+together and [docs/adr/](./docs/adr/) for why.
 
 ## 🤝 Community
 
