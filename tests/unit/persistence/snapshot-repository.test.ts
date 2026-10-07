@@ -153,6 +153,24 @@ describe('SnapshotRepository.save', () => {
     expect(repository.load().get('b', 0)).toBeUndefined();
   });
 
+  // Data can already be over the limit: written by 1.x (which only logged),
+  // by a vault with a higher limit, or before maxBytes was lowered.
+  it('lets a write through that does not grow data already over maxBytes', () => {
+    const { repository, driver } = setup({ maxBytes: 80 });
+    const oversized = Snapshot.empty
+      .with('big', entry('x'.repeat(100)))
+      .with('small', entry(1));
+    driver.write('K', encodeEnvelope(oversized));
+
+    const shrunk = repository.load().without('small');
+    repository.save(shrunk);
+
+    expect(driver.read('K')).toBe(encodeEnvelope(shrunk));
+    expect(() => repository.save(shrunk.with('more', entry(2)))).toThrow(
+      StorageQuotaError
+    );
+  });
+
   // Regression for the 1.x defect: at quota, 1.x retried with stale data,
   // returned true, and silently dropped the new value.
   it('turns a browser quota error into StorageQuotaError and keeps the previous state', () => {

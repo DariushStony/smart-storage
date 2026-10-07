@@ -109,15 +109,15 @@ After `dispose()` every other method throws `StorageDisposedError`.
 
 ### Options
 
-| Option       | Default     | Description                                                                      |
-| ------------ | ----------- | -------------------------------------------------------------------------------- |
-| `key`        | (required)  | Storage key the vault owns.                                                      |
-| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'` or a `StorageDriver`.                         |
-| `codecs`     | `[]`        | `{ encode, decode }` string transforms, applied after JSON and reversed on read. |
-| `debounceMs` | `0`         | Coalesce writes made within this window. `0` writes every change immediately.    |
-| `maxBytes`   | `4_000_000` | Hard limit on the stored string (UTF-8 bytes). Exceeding it throws.              |
-| `maxItems`   | `Infinity`  | Keep at most this many items; the least recently written are evicted first.      |
-| `onError`    | none        | Receives problems the caller cannot see otherwise (see [Errors](#errors)).       |
+| Option       | Default     | Description                                                                                                                                           |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`        | (required)  | Storage key the vault owns.                                                                                                                           |
+| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'` or a `StorageDriver`.                                                                                              |
+| `codecs`     | `[]`        | `{ encode, decode }` string transforms, applied after JSON and reversed on read.                                                                      |
+| `debounceMs` | `0`         | Coalesce writes made within this window. `0` writes every change immediately.                                                                         |
+| `maxBytes`   | `4_000_000` | Hard limit on the stored string (UTF-8 bytes). A write that would grow it past the limit throws; writes that shrink data already over it are allowed. |
+| `maxItems`   | `Infinity`  | Keep at most this many items; the least recently written are evicted first.                                                                           |
+| `onError`    | none        | Receives problems the caller cannot see otherwise (see [Errors](#errors)).                                                                            |
 
 ---
 

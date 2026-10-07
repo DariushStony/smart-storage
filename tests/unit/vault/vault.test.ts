@@ -345,6 +345,25 @@ describe('limits', () => {
     expect(vault.keys()).toEqual(['a']);
   });
 
+  it('can still shrink stored data that is already over maxBytes', () => {
+    const driver = new MemoryDriver();
+    driver.write(
+      'BIG',
+      JSON.stringify({
+        a: { value: 'x'.repeat(200), expiry: null },
+        b: { value: 1, expiry: null },
+      })
+    );
+    const { vault } = makeVault({ key: 'BIG', maxBytes: 100 }, driver);
+
+    expect(vault.remove('b')).toBe(true);
+    expect(() => vault.set('c', 'more')).toThrow(StorageQuotaError);
+    expect(vault.remove('a')).toBe(true);
+    vault.set('c', 'more');
+
+    expect(vault.keys()).toEqual(['c']);
+  });
+
   it('stats() describes the stored data', () => {
     const { vault, raw } = makeVault({ maxBytes: 1000 });
     vault.set('a', 'é');

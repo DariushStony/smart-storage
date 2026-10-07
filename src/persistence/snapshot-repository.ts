@@ -56,7 +56,10 @@ class SnapshotRepository {
   save(snapshot: Snapshot): void {
     const raw = this.serializer.serialize(snapshot);
     const bytes = utf8ByteLength(raw);
-    if (bytes > this.maxBytes) {
+    // Stored data may already be over the limit (written by 1.x, or under a
+    // higher limit). Writes that do not grow it must pass, or it could
+    // never be shrunk.
+    if (bytes > this.maxBytes && bytes > this.storedBytes()) {
       throw new StorageQuotaError(
         `"${this.key}" would be ${String(bytes)} bytes, over its ${String(this.maxBytes)}-byte limit.`
       );
@@ -94,6 +97,10 @@ class SnapshotRepository {
 
   measure(snapshot: Snapshot): number {
     return utf8ByteLength(this.serializer.serialize(snapshot));
+  }
+
+  private storedBytes(): number {
+    return this.cachedRaw === null ? 0 : utf8ByteLength(this.cachedRaw);
   }
 
   private readRaw(): string | null {
