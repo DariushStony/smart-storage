@@ -19,8 +19,8 @@ export default defineConfig({
     unstubGlobals: true,
     coverage: {
       provider: 'v8',
-      // Reported, not gated -- see CONTRIBUTING. Add thresholds once the
-      // numbers have settled rather than picking one up front.
+      // Enforced: the rewrite is fully covered, and must stay that way.
+      thresholds: { lines: 95, functions: 95, statements: 95, branches: 90 },
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
       // Type-only modules have no runtime code to measure.
