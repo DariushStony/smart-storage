@@ -79,7 +79,7 @@ encryption helpers, framework bindings.
                        └──────────────────────┘
 ```
 
-Dependency rule: `core` imports nothing; `codec` imports nothing;
+Dependency rule: `core` imports only `errors`; `codec` imports nothing;
 `persistence` imports `core`, `codec`, `drivers` (port only), `errors`;
 `vault` composes everything. Nothing below `vault` knows which concrete driver
 or strategy is in use.
