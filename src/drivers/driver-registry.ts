@@ -1,6 +1,7 @@
 import { assertKey } from '../core/validation.js';
 import { StorageArgumentError, StorageUnavailableError } from '../errors.js';
 import type { Reporter } from '../reporting/reporter.js';
+import type { AsyncStorageDriver } from './async-storage-driver.js';
 import { MemoryDriver } from './memory-driver.js';
 import { isStorageDriver } from './storage-driver.js';
 import type { StorageDriver } from './storage-driver.js';
@@ -14,11 +15,16 @@ type DriverSpec =
   | (string & Record<never, never>)
   | StorageDriver;
 
+type AnyStorageDriver = StorageDriver | AsyncStorageDriver;
+
 /**
  * Builds the driver for a registered name. Throw to say "not available
  * here": vaults then fall back to memory and report StorageUnavailableError.
  */
 type DriverFactory = () => StorageDriver;
+
+/** Like DriverFactory, for drivers only createAsyncVault can use. */
+type AsyncDriverFactory = () => AsyncStorageDriver;
 
 interface RegisterDriverOptions {
   /**
@@ -29,17 +35,26 @@ interface RegisterDriverOptions {
 }
 
 interface Resolution {
-  driver: StorageDriver;
+  driver: AnyStorageDriver;
   problem?: StorageUnavailableError;
 }
 
 interface Registration {
-  factory: DriverFactory;
+  kind: 'sync' | 'async';
+  factory: () => AnyStorageDriver;
   shared: boolean;
   resolution?: Resolution;
 }
 
-const BUILT_IN_NAMES: readonly string[] = ['local', 'session', 'memory'];
+// indexeddb is resolved by the async vault itself, so sync-only bundles never
+// include the IndexedDB driver; it is reserved here all the same.
+const BUILT_IN_NAMES: readonly string[] = [
+  'local',
+  'session',
+  'memory',
+  'indexeddb',
+];
+const ASYNC_BUILT_IN_NAMES: readonly string[] = ['indexeddb'];
 
 function webStorageFactory(
   name: 'localStorage' | 'sessionStorage'
@@ -56,9 +71,26 @@ function webStorageFactory(
 
 function builtIns(): Map<string, Registration> {
   return new Map<string, Registration>([
-    ['local', { factory: webStorageFactory('localStorage'), shared: true }],
-    ['session', { factory: webStorageFactory('sessionStorage'), shared: true }],
-    ['memory', { factory: () => new MemoryDriver(), shared: false }],
+    [
+      'local',
+      {
+        kind: 'sync',
+        factory: webStorageFactory('localStorage'),
+        shared: true,
+      },
+    ],
+    [
+      'session',
+      {
+        kind: 'sync',
+        factory: webStorageFactory('sessionStorage'),
+        shared: true,
+      },
+    ],
+    [
+      'memory',
+      { kind: 'sync', factory: () => new MemoryDriver(), shared: false },
+    ],
   ]);
 }
 
@@ -78,14 +110,38 @@ function registerDriver(
   factory: DriverFactory,
   options: RegisterDriverOptions = {}
 ): void {
+  register(name, factory, 'sync', options, 'registerDriver');
+}
+
+/**
+ * Makes an async driver available by name to `createAsyncVault`. Same rules
+ * as registerDriver; `createVault` refuses these names.
+ */
+function registerAsyncDriver(
+  name: string,
+  factory: AsyncDriverFactory,
+  options: RegisterDriverOptions = {}
+): void {
+  register(name, factory, 'async', options, 'registerAsyncDriver');
+}
+
+function register(
+  name: string,
+  factory: unknown,
+  kind: Registration['kind'],
+  options: RegisterDriverOptions,
+  caller: string
+): void {
   assertKey(name, 'Driver name');
   assertNotBuiltIn(name);
   if (typeof factory !== 'function') {
-    throw new StorageArgumentError(
-      'registerDriver() needs a factory function.'
-    );
+    throw new StorageArgumentError(`${caller}() needs a factory function.`);
   }
-  registrations.set(name, { factory, shared: options.shared ?? true });
+  registrations.set(name, {
+    kind,
+    factory: factory as () => AnyStorageDriver,
+    shared: options.shared ?? true,
+  });
 }
 
 /** Returns false when the name was not registered. */
@@ -94,7 +150,25 @@ function unregisterDriver(name: string): boolean {
   return registrations.delete(name);
 }
 
+/** For createVault: sync drivers only. */
 function resolveDriver(spec: DriverSpec, report: Reporter): StorageDriver {
+  if (
+    typeof spec === 'string' &&
+    (ASYNC_BUILT_IN_NAMES.includes(spec) ||
+      registrations.get(spec)?.kind === 'async')
+  ) {
+    throw new StorageArgumentError(
+      `"${spec}" is an async driver; use createAsyncVault() with it.`
+    );
+  }
+  return resolveAnyDriver(spec, report) as StorageDriver;
+}
+
+/** For createAsyncVault: drivers of either kind (it awaits every call). */
+function resolveAnyDriver(
+  spec: string | AnyStorageDriver,
+  report: Reporter
+): AnyStorageDriver {
   if (typeof spec !== 'string') return spec;
 
   const registration = registrations.get(spec);
@@ -106,7 +180,7 @@ function resolveDriver(spec: DriverSpec, report: Reporter): StorageDriver {
 
   let resolution = registration.resolution;
   if (!resolution) {
-    resolution = build(spec, registration.factory);
+    resolution = buildDriver(spec, registration.factory);
     if (registration.shared) registration.resolution = resolution;
   }
   if (resolution.problem) report(resolution.problem);
@@ -117,7 +191,10 @@ function resolveDriver(spec: DriverSpec, report: Reporter): StorageDriver {
  * What "the same storage" means for conflict detection: the shared name's
  * scope for registered shared drivers, otherwise the driver instance.
  */
-function conflictScope(spec: DriverSpec, driver: StorageDriver): object {
+function conflictScope(
+  spec: string | AnyStorageDriver,
+  driver: AnyStorageDriver
+): object {
   if (typeof spec !== 'string' || !registrations.get(spec)?.shared) {
     return driver;
   }
@@ -129,7 +206,11 @@ function conflictScope(spec: DriverSpec, driver: StorageDriver): object {
   return scope;
 }
 
-function build(name: string, factory: DriverFactory): Resolution {
+/** Runs a factory; a throw means "unavailable here" and falls back to memory. */
+function buildDriver(
+  name: string,
+  factory: () => AnyStorageDriver
+): Resolution {
   let driver: unknown;
   try {
     driver = factory();
@@ -166,9 +247,19 @@ function resetDriverRegistry(): void {
 
 export {
   registerDriver,
+  registerAsyncDriver,
   unregisterDriver,
   resolveDriver,
+  resolveAnyDriver,
+  buildDriver,
   conflictScope,
   resetDriverRegistry,
 };
-export type { DriverSpec, DriverFactory, RegisterDriverOptions };
+export type {
+  DriverSpec,
+  DriverFactory,
+  AsyncDriverFactory,
+  AnyStorageDriver,
+  RegisterDriverOptions,
+  Resolution,
+};
