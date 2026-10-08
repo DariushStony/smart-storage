@@ -1,6 +1,8 @@
 // Compiled against the built dist/ with skipLibCheck off, the way a strict
 // consumer would, so broken declaration files fail the build.
 import { StorageQuotaError, createVault } from '@dariushstony/smart-storage';
+import { assertStorageDriver } from '@dariushstony/smart-storage/testing';
+import type { ConformanceReport } from '@dariushstony/smart-storage/testing';
 import type {
   Codec,
   StorageDriver,
@@ -17,3 +19,6 @@ export const driverName = (driver: StorageDriver): string => driver.name;
 export const isQuota = (error: unknown): boolean =>
   error instanceof StorageQuotaError;
 export const causeOf = (error: StorageQuotaError): unknown => error.cause;
+export const checkDriver = (driver: StorageDriver): Promise<void> =>
+  assertStorageDriver(() => driver);
+export const passed = (report: ConformanceReport): boolean => report.passed;
