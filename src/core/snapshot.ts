@@ -46,6 +46,11 @@ class Snapshot {
     return Array.from(this.entries);
   }
 
+  withoutExpired(now: number): Snapshot {
+    const live = this.live(now);
+    return live.length === this.entries.size ? this : Snapshot.from(live);
+  }
+
   /** Drops expired entries, then evicts the least recently written beyond maxItems. */
   compact(now: number, maxItems: number): Snapshot {
     const live = this.live(now);

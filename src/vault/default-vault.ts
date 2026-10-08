@@ -1,8 +1,12 @@
-import { remainingTtl, toJson } from '../core/entry.js';
+import { expiryAfter, remainingTtl, toJson } from '../core/entry.js';
 import type { Entry } from '../core/entry.js';
 import type { Snapshot } from '../core/snapshot.js';
 import { assertKey, assertPositive } from '../core/validation.js';
-import { StorageDisposedError, toStorageError } from '../errors.js';
+import {
+  StorageArgumentError,
+  StorageDisposedError,
+  toStorageError,
+} from '../errors.js';
 import type { SnapshotRepository } from '../persistence/snapshot-repository.js';
 import type { WriteStrategy } from '../persistence/write-strategy.js';
 import type { Reporter } from '../reporting/reporter.js';
@@ -52,12 +56,15 @@ class DefaultVault implements Vault, Retirable {
   set<T>(key: string, value: T, options: SetOptions = {}): void {
     this.assertUsable();
     assertKey(key);
+    if (typeof (options as unknown) !== 'object' || options === null) {
+      throw new StorageArgumentError('set() options must be an object.');
+    }
     const { ttl } = options;
     if (ttl !== undefined) assertPositive('ttl', ttl);
     const json = toJson(value);
 
     const now = Date.now();
-    const expiresAt = ttl === undefined ? null : now + ttl;
+    const expiresAt = ttl === undefined ? null : expiryAfter(now, ttl);
     this.commit(this.current().with(key, { json, expiresAt }), now);
   }
 
@@ -66,10 +73,9 @@ class DefaultVault implements Vault, Retirable {
   }
 
   update<T>(key: string, value: T): boolean {
-    return this.rewrite(key, (entry) => ({
-      json: toJson(value),
-      expiresAt: entry.expiresAt,
-    }));
+    this.assertUsable();
+    const json = toJson(value);
+    return this.rewrite(key, (entry) => ({ json, expiresAt: entry.expiresAt }));
   }
 
   extend(key: string, ms: number): boolean {
@@ -78,7 +84,7 @@ class DefaultVault implements Vault, Retirable {
     return this.rewrite(key, (entry) =>
       entry.expiresAt === null
         ? entry
-        : { json: entry.json, expiresAt: entry.expiresAt + ms }
+        : { json: entry.json, expiresAt: expiryAfter(entry.expiresAt, ms) }
     );
   }
 
@@ -113,16 +119,19 @@ class DefaultVault implements Vault, Retirable {
 
   clear(): void {
     this.assertUsable();
-    this.strategy.discard();
+    // Remove first: if that throws, the pending change is still there.
     this.repository.remove();
+    this.strategy.discard();
   }
 
   purgeExpired(): number {
     this.assertUsable();
+    const now = Date.now();
     const snapshot = this.current();
-    const compacted = snapshot.compact(Date.now(), this.maxItems);
-    if (compacted !== snapshot) this.strategy.write(compacted);
-    return snapshot.size - compacted.size;
+    const purged = snapshot.withoutExpired(now);
+    if (purged === snapshot) return 0;
+    this.commit(purged, now);
+    return snapshot.size - purged.size;
   }
 
   flush(): void {
@@ -132,12 +141,16 @@ class DefaultVault implements Vault, Retirable {
 
   stats(): VaultStats {
     this.assertUsable();
-    const snapshot = this.current().compact(Date.now(), this.maxItems);
-    const bytes = this.repository.measure(snapshot);
+    const snapshot = this.current();
+    const pending = this.strategy.pending();
+    // current() has just read storage, so storedBytes() is up to date.
+    const bytes = pending
+      ? this.repository.measure(pending)
+      : this.repository.storedBytes();
     return {
       key: this.key,
       driver: this.repository.driverName,
-      itemCount: snapshot.size,
+      itemCount: snapshot.live(Date.now()).length,
       bytes,
       maxBytes: this.maxBytes,
       usage: bytes / this.maxBytes,

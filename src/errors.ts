@@ -25,17 +25,19 @@ interface StorageQuotaErrorOptions extends StorageErrorOptions {
  */
 class StorageError extends Error {
   readonly code: StorageErrorCode;
+  // Declared here rather than taken from lib ES2022's Error, so consumers
+  // compiling against older libs can still read it.
+  readonly cause?: unknown;
 
   constructor(
     code: StorageErrorCode,
     message: string,
     options: StorageErrorOptions = {}
   ) {
-    super(message, options);
+    super(message);
     this.name = 'StorageError';
     this.code = code;
-    // Engines older than ES2022 ignore the options argument.
-    if ('cause' in options && !('cause' in this)) this.cause = options.cause;
+    if ('cause' in options) this.cause = options.cause;
   }
 }
 

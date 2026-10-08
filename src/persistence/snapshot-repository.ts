@@ -100,7 +100,8 @@ class SnapshotRepository {
     return utf8ByteLength(this.serializer.serialize(snapshot));
   }
 
-  private storedBytes(): number {
+  /** UTF-8 size of the stored string as last read or written. */
+  storedBytes(): number {
     return this.cachedRaw === null ? 0 : utf8ByteLength(this.cachedRaw);
   }
 

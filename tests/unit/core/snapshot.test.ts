@@ -46,8 +46,8 @@ describe('Snapshot', () => {
   it('get() hides expired entries', () => {
     const snapshot = Snapshot.empty.with('a', entry(1, 100));
 
-    expect(snapshot.get('a', 99)).toEqual(entry(1, 100));
-    expect(snapshot.get('a', 100)).toBeUndefined();
+    expect(snapshot.get('a', 100)).toEqual(entry(1, 100));
+    expect(snapshot.get('a', 101)).toBeUndefined();
     expect(snapshot.get('missing', 0)).toBeUndefined();
   });
 
@@ -89,6 +89,23 @@ describe('Snapshot', () => {
       .with('c', entry(3));
 
     expect(keysOf(snapshot.compact(0, 2))).toEqual(['b', 'c']);
+  });
+
+  it('withoutExpired() drops expired entries but never evicts', () => {
+    const snapshot = Snapshot.empty
+      .with('old', entry(1, 50))
+      .with('a', entry(2))
+      .with('b', entry(3));
+
+    expect(snapshot.withoutExpired(100).all()).toEqual([
+      ['a', entry(2)],
+      ['b', entry(3)],
+    ]);
+  });
+
+  it('withoutExpired() returns the same snapshot when nothing expired', () => {
+    const snapshot = Snapshot.empty.with('a', entry(1));
+    expect(snapshot.withoutExpired(0)).toBe(snapshot);
   });
 
   it('compact() returns the same snapshot when nothing changes', () => {
