@@ -123,11 +123,18 @@ async function roundTrip(
 const CONTRACT: Check[] = [
   {
     rule: 'name',
-    description: 'name is a non-empty string',
+    description: 'name is a non-empty string that does not change',
     run: (driver) => {
-      if (typeof driver.name !== 'string' || driver.name.trim() === '') {
+      const first = driver.name;
+      const second = driver.name;
+      if (typeof first !== 'string' || first.trim() === '') {
         throw new ContractViolation(
-          `name: expected a non-empty string, got ${show(driver.name)}.`
+          `name: expected a non-empty string, got ${show(first)}.`
+        );
+      }
+      if (first !== second) {
+        throw new ContractViolation(
+          `name changed between reads: ${show(first)}, then ${show(second)}.`
         );
       }
     },
@@ -212,7 +219,8 @@ const CONTRACT: Check[] = [
     description: 'keys are independent and exact (case and spaces matter)',
     run: async (driver, keys) => {
       const removed = keys.key(`${P}a`);
-      const kept = [`${P}b`, `${P}K`, `${P}k`, `${P} k`].map((key) =>
+      // " k" and "k " catch drivers that trim keys.
+      const kept = [`${P}b`, `${P}K`, `${P}k`, `${P} k`, `${P}k `].map((key) =>
         keys.key(key)
       );
       for (const key of [removed, ...kept]) {
@@ -254,14 +262,16 @@ const SYNC_CHECK: Check = {
       ['read', driver.read(key)],
       ['remove', driver.remove(key)],
     ];
-    for (const [method, result] of results) {
-      if (isThenable(result)) {
-        // Swallow its outcome so it cannot surface as an unhandled rejection.
-        result.then(undefined, () => undefined);
-        throw new ContractViolation(
-          `${method} returned a Promise; a sync driver must return its result directly.`
-        );
-      }
+    // Settle every returned promise first, so none surfaces as an unhandled
+    // rejection after this check has already failed.
+    for (const [, result] of results) {
+      if (isThenable(result)) result.then(undefined, () => undefined);
+    }
+    const promised = results.find(([, result]) => isThenable(result));
+    if (promised) {
+      throw new ContractViolation(
+        `${promised[0]} returned a Promise; a sync driver must return its result directly.`
+      );
     }
   },
 };
@@ -271,9 +281,12 @@ async function runConformance(
   modeCheck: Check,
   options: VerifyOptions = {}
 ): Promise<ConformanceReport> {
-  const settings: Settings = {
-    largeValueLength: options.largeValueLength ?? 65_536,
-  };
+  const largeValueLength = options.largeValueLength ?? 65_536;
+  // A zero, negative or fractional size would make [large] pass trivially.
+  if (!Number.isInteger(largeValueLength) || largeValueLength < 1) {
+    throw new RangeError('largeValueLength must be a positive integer.');
+  }
+  const settings: Settings = { largeValueLength };
   const checks: ConformanceCheck[] = [];
   let driverName = 'unknown';
 

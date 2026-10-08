@@ -181,6 +181,68 @@ describe('verifyStorageDriver', () => {
     expect(report.passed).toBe(false);
   });
 
+  it('detects a driver that trims keys [independent]', async () => {
+    const report = await verifyStorageDriver(
+      brokenDriver((data) => ({
+        read: (key: string) => data.get(key.trim()) ?? null,
+        write: (key: string, value: string) => {
+          data.set(key.trim(), value);
+        },
+        remove: (key: string) => {
+          data.delete(key.trim());
+        },
+      }))
+    );
+
+    expect(
+      report.checks.find((check) => check.rule === 'independent')?.passed
+    ).toBe(false);
+  });
+
+  it('detects a name that changes between reads [name]', async () => {
+    const report = await verifyStorageDriver(() => {
+      const driver = new MemoryDriver();
+      let reads = 0;
+      Object.defineProperty(driver, 'name', {
+        get: () => {
+          reads += 1;
+          return `driver-${String(reads)}`;
+        },
+      });
+      return driver;
+    });
+
+    expect(report.checks.find((check) => check.rule === 'name')?.passed).toBe(
+      false
+    );
+  });
+
+  // An async driver handed to the sync kit must fail [sync], not crash the
+  // test run with unhandled rejections.
+  it('fails [sync] for a rejecting async driver without unhandled rejections', async () => {
+    const report = await verifyStorageDriver(
+      brokenDriver(() => ({
+        read: () => Promise.reject(new Error('read failed')),
+        write: () => Promise.reject(new Error('write failed')),
+        remove: () => Promise.reject(new Error('remove failed')),
+      }))
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(report.checks.find((check) => check.rule === 'sync')?.passed).toBe(
+      false
+    );
+  });
+
+  it.each([0, -5, 1.5, NaN])(
+    'rejects largeValueLength %j instead of passing [large] trivially',
+    async (largeValueLength) => {
+      await expect(
+        verifyStorageDriver(() => new MemoryDriver(), { largeValueLength })
+      ).rejects.toThrow(RangeError);
+    }
+  );
+
   it('records a driver whose constructor throws as failing every rule', async () => {
     const report = await verifyStorageDriver(() => {
       throw new Error('no backend');
