@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import { utf8ByteLength } from '../../../src/core/byte-size.js';
+import type { Codec } from '../../../src/codec/codec.js';
+import { AsyncMemoryDriver } from '../../../src/drivers/async-memory-driver.js';
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
 import { resetDriverRegistry } from '../../../src/drivers/driver-registry.js';
 import {
@@ -692,5 +694,46 @@ describe('edge cases', () => {
 
     vi.advanceTimersByTime(1);
     expect(vault.get('k')).toBeNull();
+  });
+});
+
+// Plain JavaScript callers get no type errors, so the sync vault checks.
+describe('async parts handed to the sync vault', () => {
+  const asyncCodec = {
+    encode: (text: string) => Promise.resolve(text),
+    decode: (text: string) => Promise.resolve(text),
+  } as unknown as Codec;
+
+  it('refuses an async codec on write instead of storing "[object Promise]"', () => {
+    const { vault, raw } = makeVault({ codecs: [asyncCodec] });
+
+    expect(() => vault.set('a', 1)).toThrow(StorageArgumentError);
+    expect(() => vault.set('a', 1)).toThrow(/createAsyncVault/);
+    expect(raw()).toBeNull();
+  });
+
+  it('refuses an async codec on read, rather than reporting the data as corrupt', () => {
+    const driver = new MemoryDriver();
+    driver.write('CODEC', '{"v":2,"items":[{"key":"keep","value":1}]}');
+    const { vault, onError } = makeVault(
+      { key: 'CODEC', codecs: [asyncCodec] },
+      driver
+    );
+
+    expect(() => vault.get('keep')).toThrow(StorageArgumentError);
+    expect(onError).not.toHaveBeenCalled();
+    expect(driver.read('CODEC')).toBe(
+      '{"v":2,"items":[{"key":"keep","value":1}]}'
+    );
+  });
+
+  it('clear() refuses an async driver', () => {
+    const vault = createVault({
+      key: 'ASYNC_CLEAR',
+      driver: new AsyncMemoryDriver() as unknown as MemoryDriver,
+    });
+    created.push(vault);
+
+    expect(() => vault.clear()).toThrow(StorageArgumentError);
   });
 });

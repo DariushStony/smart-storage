@@ -62,22 +62,26 @@ class SnapshotRepository implements SnapshotStore {
     const bytes = utf8ByteLength(raw);
     assertFits(this.key, bytes, this.storedBytes(), this.maxBytes);
 
+    let result: unknown;
     try {
-      this.driver.write(this.key, raw);
+      result = this.driver.write(this.key, raw);
     } catch (error) {
       throw writeFailure(this.key, bytes, error);
     }
+    this.assertSync(result);
 
     this.cachedRaw = raw;
     this.cached = snapshot;
   }
 
   remove(): void {
+    let result: unknown;
     try {
-      this.driver.remove(this.key);
+      result = this.driver.remove(this.key);
     } catch (error) {
       throw accessFailure('Removing', this.key, error);
     }
+    this.assertSync(result);
     this.cachedRaw = null;
     this.cached = Snapshot.empty;
   }
@@ -98,14 +102,18 @@ class SnapshotRepository implements SnapshotStore {
     } catch (error) {
       throw accessFailure('Reading', this.key, error);
     }
-    if (isThenable(raw)) {
+    this.assertSync(raw);
+    return raw;
+  }
+
+  private assertSync(result: unknown): void {
+    if (isThenable(result)) {
       // Settle it so it cannot surface as an unhandled rejection.
-      raw.then(undefined, () => undefined);
+      result.then(undefined, () => undefined);
       throw new StorageArgumentError(
         `The "${this.driver.name}" driver is asynchronous; use createAsyncVault() with it.`
       );
     }
-    return raw;
   }
 
   private decode(raw: string): Snapshot {
@@ -114,6 +122,8 @@ class SnapshotRepository implements SnapshotStore {
       if (dropped > 0) this.report(skipped(this.key, dropped));
       return snapshot;
     } catch (error) {
+      // Misuse (an async codec) is the caller's to fix, not corruption.
+      if (error instanceof StorageArgumentError) throw error;
       this.report(unreadable(this.key, error));
       return Snapshot.empty;
     }
