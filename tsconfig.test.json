@@ -8,9 +8,19 @@
     "declarationMap": false,
     "sourceMap": false,
     "types": ["node"],
-    "rootDir": "."
+    "rootDir": ".",
+    // Examples import the package by name; type-check them against src/.
+    "paths": {
+      "@dariushstony/smart-storage": ["./src/index.ts"],
+      "@dariushstony/smart-storage/testing": ["./src/testing/index.ts"]
+    }
   },
-  "include": ["tests", "vitest.config.ts", "playwright.config.ts"],
+  "include": [
+    "tests",
+    "examples/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ],
   // Checked against dist/ by tsconfig.consumer.json instead.
   "exclude": ["tests/types"]
 }
