@@ -56,7 +56,9 @@ describe('testing entry', () => {
   it('exports exactly the kit', async () => {
     const testing = await import('../../src/testing/index.js');
     expect(Object.keys(testing).sort()).toEqual([
+      'assertAsyncStorageDriver',
       'assertStorageDriver',
+      'verifyAsyncStorageDriver',
       'verifyStorageDriver',
     ]);
   });

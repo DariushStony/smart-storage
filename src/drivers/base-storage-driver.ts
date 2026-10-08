@@ -10,6 +10,18 @@ interface BaseStorageDriverOptions {
   namespace?: string;
 }
 
+/** Validates a namespace and returns the key prefix it stands for. */
+function namespacePrefix(namespace: string | undefined): string {
+  if (namespace === undefined) return '';
+  assertKey(namespace, 'namespace');
+  if (namespace.includes(':')) {
+    throw new StorageArgumentError(
+      'namespace must not contain ":"; "app" with key "x:y" and "app:x" with key "y" would collide.'
+    );
+  }
+  return `${namespace}:`;
+}
+
 /**
  * A starting point for custom drivers (Template Method). Implement the three
  * raw methods; the public `read` / `write` / `remove` add the namespace and
@@ -21,16 +33,7 @@ abstract class BaseStorageDriver implements StorageDriver {
   readonly #prefix: string;
 
   constructor(options: BaseStorageDriverOptions = {}) {
-    const { namespace } = options;
-    if (namespace !== undefined) {
-      assertKey(namespace, 'namespace');
-      if (namespace.includes(':')) {
-        throw new StorageArgumentError(
-          'namespace must not contain ":"; "app" with key "x:y" and "app:x" with key "y" would collide.'
-        );
-      }
-    }
-    this.#prefix = namespace === undefined ? '' : `${namespace}:`;
+    this.#prefix = namespacePrefix(options.namespace);
   }
 
   read(key: string): string | null {
@@ -53,5 +56,5 @@ abstract class BaseStorageDriver implements StorageDriver {
   protected abstract removeRaw(key: string): void;
 }
 
-export { BaseStorageDriver };
+export { BaseStorageDriver, namespacePrefix };
 export type { BaseStorageDriverOptions };
