@@ -110,7 +110,7 @@ After `dispose()` every other method throws `StorageDisposedError`.
 | Option       | Default     | Description                                                                                                                                           |
 | ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key`        | (required)  | Storage key the vault owns.                                                                                                                           |
-| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'` or a `StorageDriver`.                                                                                              |
+| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'`, a name added with `registerDriver`, or a `StorageDriver` instance.                                                |
 | `codecs`     | `[]`        | `{ encode, decode }` string transforms, applied after JSON and reversed on read.                                                                      |
 | `debounceMs` | `0`         | Coalesce writes made within this window. `0` writes every change immediately.                                                                         |
 | `maxBytes`   | `4_000_000` | Hard limit on the stored string (UTF-8 bytes). A write that would grow it past the limit throws; writes that shrink data already over it are allowed. |
@@ -248,6 +248,10 @@ import { assertStorageDriver } from '@dariushstony/smart-storage/testing';
 
 await assertStorageDriver(() => new MyDriver());
 ```
+
+The built-in drivers are exported too: `WebStorageDriver` wraps anything with
+`getItem` / `setItem` / `removeItem`, and `MemoryDriver` keeps data in a
+`Map`. Both accept `{ namespace }`, so several apps can share one backend.
 
 [docs/CUSTOM_STORAGE.md](./docs/CUSTOM_STORAGE.md) covers the full contract,
 errors, registration and a checklist.

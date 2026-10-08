@@ -30,20 +30,20 @@ interface StorageDriver {
 Each driver must follow the rules below. The conformance kit checks every one
 of them and reports failures by these rule ids.
 
-| Rule             | Requirement                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `sync`           | `read`, `write` and `remove` return their results directly, never a Promise.                                                   |
-| `name`           | `name` is a non-empty string and does not change. It shows up in `vault.stats().driver` and in error messages.                 |
-| `missing`        | `read` of a key that was never written returns `null` (not `undefined`, not `''`).                                             |
-| `roundtrip`      | `read` after `write` returns exactly the written string.                                                                       |
-| `empty`          | The empty string round-trips as `''`, not `null`.                                                                              |
-| `exact`          | Unicode (including emoji), quotes, backslashes, newlines and JSON text round-trip unchanged. Don't trim and don't re-encode.   |
-| `large`          | Large values round-trip. The kit uses 64 KB by default; small backends can lower it.                                           |
-| `overwrite`      | A second `write` to a key replaces its value.                                                                                  |
-| `remove`         | After `remove`, `read` returns `null`.                                                                                         |
-| `remove-missing` | `remove` of a key that was never written does nothing. It must not throw.                                                      |
-| `independent`    | Keys are independent and exact: removing `a` leaves `b`, and `K`, `k` and `" k"` are three different keys.                     |
-| `any-key`        | Keys may contain `:`, `/`, spaces, unicode and `__proto__`. A driver backed by a plain object usually fails this; use a `Map`. |
+| Rule             | Requirement                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sync`           | `read`, `write` and `remove` return their results directly, never a Promise.                                                               |
+| `name`           | `name` is a non-empty string and does not change. It shows up in `vault.stats().driver` and in error messages.                             |
+| `missing`        | `read` of a key that was never written returns `null` (not `undefined`, not `''`).                                                         |
+| `roundtrip`      | `read` after `write` returns exactly the written string.                                                                                   |
+| `empty`          | The empty string round-trips as `''`, not `null`.                                                                                          |
+| `exact`          | Unicode (including emoji), quotes, backslashes, newlines and JSON text round-trip unchanged. Don't trim and don't re-encode.               |
+| `large`          | Large values round-trip. The kit uses 64 KB by default; small backends can lower it.                                                       |
+| `overwrite`      | A second `write` to a key replaces its value.                                                                                              |
+| `remove`         | After `remove`, `read` returns `null`.                                                                                                     |
+| `remove-missing` | `remove` of a key that was never written does nothing. It must not throw.                                                                  |
+| `independent`    | Keys are independent and exact: removing `a` leaves `b`, and `K`, `k`, `" k"` and `"k "` are four different keys. Don't trim or fold case. |
+| `any-key`        | Keys may contain `:`, `/`, spaces, unicode and `__proto__`. A driver backed by a plain object usually fails this; use a `Map`.             |
 
 Two more rules can't be checked automatically:
 
@@ -100,7 +100,8 @@ class SharedWorkerDriver implements StorageDriver {
 
 The base class is a template: you implement three protected methods, and it
 supplies `read`, `write` and `remove`, plus an optional `namespace` that
-prefixes every key. A namespace keeps several apps (or several drivers) on
+prefixes every key (it must not contain `:`, so two namespaces can never
+overlap). A namespace keeps several apps (or several drivers) on
 one backend from colliding.
 
 ```ts
@@ -135,11 +136,11 @@ Don't override `read`, `write` or `remove`; they apply the namespace.
 
 ## 4. Errors
 
-| Situation                                            | What your driver does                                     | What the caller sees                                        |
-| ---------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
-| The backend is full                                  | Throw an error named `'QuotaExceededError'`               | `StorageQuotaError`; earlier data is intact                 |
-| The backend refuses or fails                         | Throw anything                                            | `StorageAccessError` with your error as `cause`             |
-| The backend does not exist here (e.g. on the server) | Throw from the constructor or from the registered factory | The vault uses memory and reports `StorageUnavailableError` |
+| Situation                                            | What your driver does                       | What the caller sees                                                                                                                                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The backend is full                                  | Throw an error named `'QuotaExceededError'` | `StorageQuotaError`; earlier data is intact                                                                                                                                                                                |
+| The backend refuses or fails                         | Throw anything                              | `StorageAccessError` with your error as `cause`                                                                                                                                                                            |
+| The backend does not exist here (e.g. on the server) | Throw from the constructor                  | Through `registerDriver`: the vault uses memory and reports `StorageUnavailableError`. If you construct the driver yourself (`driver: new X()`), the throw reaches your code, so register drivers that may be unavailable. |
 
 ## 5. Verify it with the conformance kit
 
@@ -205,9 +206,15 @@ registerDriver(
 - **Removing.** `unregisterDriver(name)` removes a custom driver.
 - **Reserved names.** `local`, `session` and `memory` can't be replaced or
   removed.
-- **Scope.** The registry is per JavaScript realm. Register before creating
-  vaults that use the name; an unknown name makes `createVault` throw a
-  `StorageArgumentError` that tells you to register it.
+- **The fallback is permanent.** Once a shared name has fallen back to memory,
+  every vault using it stays in memory for the life of the page. You only see
+  it through `onError` (`StorageUnavailableError`) or
+  `vault.stats().driver === 'memory'`.
+- **Scope.** There is one registry per loaded copy of the package. An app that
+  loads both the ESM and CommonJS builds, or two installed versions, has two
+  registries. Register before creating vaults that use the name; an unknown
+  name makes `createVault` throw a `StorageArgumentError` that tells you to
+  register it.
 
 ## 7. Use it
 
