@@ -251,8 +251,12 @@ Async codecs can await, so AES-GCM encryption is a few lines:
 ```ts
 import type { AsyncCodec } from '@dariushstony/smart-storage';
 
-const toBase64 = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes));
+// A loop, not String.fromCharCode(...bytes): spreading a large blob overflows the call stack.
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
 const fromBase64 = (text: string): Uint8Array =>
   Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
