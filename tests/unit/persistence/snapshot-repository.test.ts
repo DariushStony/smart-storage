@@ -7,9 +7,11 @@ import { utf8ByteLength } from '../../../src/core/byte-size.js';
 import type { Entry } from '../../../src/core/entry.js';
 import { encodeEnvelope } from '../../../src/core/envelope.js';
 import { Snapshot } from '../../../src/core/snapshot.js';
+import { AsyncMemoryDriver } from '../../../src/drivers/async-memory-driver.js';
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
 import {
   StorageAccessError,
+  StorageArgumentError,
   StorageCorruptionError,
   StorageQuotaError,
 } from '../../../src/errors.js';
@@ -318,5 +320,20 @@ describe('SnapshotRepository seams', () => {
 
     driver.write('K', 'OTHER');
     expect(repository.load().get('a', 0)).toEqual(entry(1));
+  });
+});
+
+describe('SnapshotRepository with an async driver', () => {
+  it('refuses it with StorageArgumentError instead of storing a Promise', () => {
+    const repository = new SnapshotRepository({
+      driver: new AsyncMemoryDriver() as unknown as MemoryDriver,
+      key: 'K',
+      serializer: new SnapshotSerializer(composeCodecs([])),
+      maxBytes: 1000,
+      report: vi.fn(),
+    });
+
+    expect(() => repository.load()).toThrow(StorageArgumentError);
+    expect(() => repository.load()).toThrow(/createAsyncVault/);
   });
 });
