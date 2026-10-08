@@ -4,11 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg)](https://www.typescriptlang.org/)
 
-A small, typed vault over `localStorage`, `sessionStorage` or memory. Each
-vault owns one storage key and keeps all its items in it, with per-item
-expiry, optional codecs (compression, encoding), optional debounced writes,
-and typed errors instead of silent failures. It is SSR-safe and reads data
-written by 1.x.
+A small, typed vault over `localStorage`, `sessionStorage`, IndexedDB or
+memory, or over any storage you plug in. Each vault owns one storage key and
+keeps all its items in it, with per-item expiry, optional codecs
+(compression, encoding, encryption), optional debounced writes, and typed
+errors instead of silent failures. It is SSR-safe and reads data written by
+1.x.
 
 ```ts
 import { createVault } from '@dariushstony/smart-storage';
@@ -34,8 +35,10 @@ pnpm add @dariushstony/smart-storage
 yarn add @dariushstony/smart-storage
 ```
 
-ESM and CommonJS builds, TypeScript types included, no runtime dependencies,
-about 4 kB minified and brotlied. Targets ES2019.
+ESM and CommonJS builds, TypeScript types included, no runtime dependencies.
+Importing only `createVault` costs under 5 kB minified and brotlied, because
+the async vault and the IndexedDB driver are tree-shaken away. The whole
+package is about 6 kB. Targets ES2019.
 
 ---
 
@@ -187,8 +190,9 @@ same key: the last writer wins.
 ## Codecs
 
 Codecs transform the whole stored string: compression, encoding, and so on.
-They run after `JSON.stringify` on write and in reverse order on read, and they
-must be synchronous (async Web Crypto is not supported yet).
+They run after `JSON.stringify` on write and in reverse order on read. Codecs
+for `createVault` must be synchronous; for asynchronous ones such as Web
+Crypto encryption, use [`createAsyncVault`](#async-vault-and-indexeddb).
 
 ```ts
 import LZString from 'lz-string';
@@ -207,6 +211,81 @@ const cache = createVault({
 If a codec cannot decode what is stored (for example after you change it),
 the vault reports `CORRUPTED`, reads as empty, and replaces the data on the
 next write.
+
+---
+
+## Async vault and IndexedDB
+
+For backends that cannot answer synchronously, use `createAsyncVault`. It
+defaults to IndexedDB, which has far more room than `localStorage`:
+
+```ts
+import { createAsyncVault } from '@dariushstony/smart-storage';
+
+export const cache = createAsyncVault({ key: 'API_CACHE' });
+
+await cache.set('user:1', user, { ttl: 60_000 });
+const cached = await cache.get<User>('user:1');
+```
+
+- **Same rules as the sync vault:** the same methods, options, TTL rules,
+  errors and 1.x data reading, but every method returns a Promise.
+  Failures reject; nothing throws synchronously. `createAsyncVault` itself
+  validates its options immediately and throws on bad ones.
+- **Ordered calls:** calls run one at a time in call order, so
+  `Promise.all([cache.set('a', 1), cache.set('b', 2)])` never loses an update.
+- **Any driver:** `driver` takes `'indexeddb'` (the default), any sync driver
+  name or instance (`'local'`, `'memory'`, …), or an async driver registered
+  with `registerAsyncDriver`. `createVault` refuses async drivers with a clear
+  error.
+- **Fallbacks:** on the server, or in a browser without IndexedDB, it falls
+  back to memory (reported in the browser case, as with `localStorage`).
+- **Debounced writes:** with `debounceMs`, a flush on page hide is
+  best-effort, because the browser may end the page before an async write
+  finishes. Call `flush()` before navigating if the write matters.
+
+### Encrypting with Web Crypto
+
+Async codecs can await, so AES-GCM encryption is a few lines:
+
+```ts
+import type { AsyncCodec } from '@dariushstony/smart-storage';
+
+const toBase64 = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes));
+const fromBase64 = (text: string): Uint8Array =>
+  Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+
+function aesGcm(key: CryptoKey): AsyncCodec {
+  return {
+    async encode(text) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const data = new TextEncoder().encode(text);
+      const sealed = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        data
+      );
+      return `${toBase64(iv)}.${toBase64(new Uint8Array(sealed))}`;
+    },
+    async decode(text) {
+      const [iv = '', sealed = ''] = text.split('.');
+      const data = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: fromBase64(iv) },
+        key,
+        fromBase64(sealed)
+      );
+      return new TextDecoder().decode(data);
+    },
+  };
+}
+
+const secrets = createAsyncVault({ key: 'NOTES', codecs: [aesGcm(key)] });
+```
+
+This hides data from someone reading storage, but not from scripts running
+on your page, which can use the same key. The security warning above still
+applies.
 
 ---
 

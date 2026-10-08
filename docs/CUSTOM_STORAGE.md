@@ -246,6 +246,71 @@ detection works per driver instance.
 - [ ] `name` is meaningful in `stats()` and logs.
 - [ ] If the backend is shared with other code, you pass a `namespace`.
 
+## Async backends
+
+Some backends can only answer asynchronously: IndexedDB, React Native's
+AsyncStorage, a remote key-value API. They implement `AsyncStorageDriver`,
+the same contract with Promises, and are used through `createAsyncVault`.
+
+```ts
+interface AsyncStorageDriver {
+  readonly name: string;
+  read(key: string): Promise<string | null>;
+  write(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+```
+
+- **Contract.** Every rule in §2 applies. Rule `sync` is replaced by
+  **`async`**: `read`, `write` and `remove` return Promises. Failures reject,
+  and a full backend rejects with an error named `'QuotaExceededError'`.
+- **Base class.** `BaseAsyncStorageDriver` is the async template:
+  implement `readRaw`, `writeRaw` and `removeRaw` returning Promises, and get
+  `namespace` for free. Its public methods are `async`, so even a raw method
+  that throws synchronously ends up as a rejection.
+- **Registration.** `registerAsyncDriver(name, factory, options?)` has the
+  same rules as `registerDriver`. `createAsyncVault` accepts those names,
+  while `createVault` refuses them with a message pointing at
+  `createAsyncVault`.
+- **Verification.** Use `verifyAsyncStorageDriver` /
+  `assertAsyncStorageDriver` from `@dariushstony/smart-storage/testing`.
+- **Sync drivers work too.** `createAsyncVault` awaits every driver call, so
+  any sync driver (`'local'`, your `StorageDriver`) works with it unchanged.
+
+```ts
+import {
+  BaseAsyncStorageDriver,
+  createAsyncVault,
+  registerAsyncDriver,
+} from '@dariushstony/smart-storage';
+import { assertAsyncStorageDriver } from '@dariushstony/smart-storage/testing';
+
+class NativeStorageDriver extends BaseAsyncStorageDriver {
+  readonly name = 'native';
+  protected async readRaw(key: string) {
+    return (await NativeStorage.getItem(key)) ?? null;
+  }
+  protected async writeRaw(key: string, value: string) {
+    await NativeStorage.setItem(key, value);
+  }
+  protected async removeRaw(key: string) {
+    await NativeStorage.removeItem(key);
+  }
+}
+
+await assertAsyncStorageDriver(() => new NativeStorageDriver()); // in a test
+
+registerAsyncDriver(
+  'native',
+  () => new NativeStorageDriver({ namespace: 'myapp' })
+);
+export const settings = createAsyncVault({ key: 'SETTINGS', driver: 'native' });
+```
+
+The built-in `IndexedDBDriver` (`src/drivers/indexeddb-driver.ts`) is the
+reference async driver. It opens lazily, upgrades a database that lacks its
+store, and closes when another tab needs to upgrade.
+
 ## A complete example
 
 [`examples/cookie-driver`](../examples/cookie-driver/) is a full driver built

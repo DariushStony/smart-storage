@@ -376,15 +376,21 @@ src/
 │   ├── envelope.ts             # On-disk format v2, reads 1.x
 │   ├── validation.ts           # Argument checks
 │   └── byte-size.ts            # UTF-8 length
-├── codec/codec.ts              # Codec interface, composeCodecs
+├── codec/                      # Codec + AsyncCodec and their composition
 ├── drivers/                    # Port + adapters
 │   ├── storage-driver.ts       # StorageDriver port and its contract
 │   ├── base-storage-driver.ts  # BaseStorageDriver (Template Method, namespace)
-│   ├── driver-registry.ts      # registerDriver; built-ins registered the same way
+│   ├── driver-registry.ts      # registerDriver / registerAsyncDriver
+│   ├── async-storage-driver.ts # AsyncStorageDriver port
+│   ├── base-async-storage-driver.ts, async-memory-driver.ts
+│   ├── indexeddb-driver.ts     # IndexedDBDriver
+│   ├── indexeddb-builtin.ts    # 'indexeddb' resolution (tree-shakeable)
 │   ├── web-storage-driver.ts   # localStorage / sessionStorage adapter
 │   ├── memory-driver.ts        # Map adapter (SSR, tests)
 ├── persistence/
-│   ├── snapshot-store.ts       # SnapshotStore / SnapshotFormat interfaces
+│   ├── snapshot-store.ts       # Store / format interfaces (sync and async)
+│   ├── store-policy.ts         # Size, quota and corruption rules (shared)
+│   ├── async-*.ts              # Async serializer, repository, write strategies
 │   ├── snapshot-serializer.ts  # Snapshot ↔ string (envelope + codecs)
 │   ├── snapshot-repository.ts  # Load/save via a driver, quota handling
 │   ├── write-strategy.ts       # Immediate / debounced writes
@@ -394,9 +400,13 @@ src/
 └── vault/
     ├── vault.ts                # Public Vault interface and option types
     ├── options.ts              # Defaults and option validation
+    ├── operations.ts           # Pure operations both vaults apply
     ├── default-vault.ts        # The Vault facade
+    ├── default-async-vault.ts  # The AsyncVault facade
+    ├── operation-queue.ts      # Runs async calls one at a time
     ├── registry.ts             # One live vault per storage key
-    └── create-vault.ts         # Composition root
+    ├── create-vault.ts         # Composition root (sync)
+    └── create-async-vault.ts   # Composition root (async)
 ```
 
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for how the layers fit
