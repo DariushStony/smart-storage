@@ -71,6 +71,38 @@ describe('BaseStorageDriver', () => {
     ).toThrow(StorageArgumentError);
   });
 
+  // "app" + "x:y" and "app:x" + "y" would both store "app:x:y".
+  it('rejects a namespace containing ":", which could collide with another namespace', () => {
+    expect(() => new RecordingDriver({ namespace: 'app:x' })).toThrow(
+      StorageArgumentError
+    );
+  });
+
+  it('leaves subclasses free to use a field named prefix', () => {
+    class CookieLikeDriver extends BaseStorageDriver {
+      override readonly name = 'cookie-like';
+      private readonly prefix = 'c_';
+      readonly data = new Map<string, string>();
+
+      protected override readRaw(key: string): string | null {
+        return this.data.get(this.prefix + key) ?? null;
+      }
+
+      protected override writeRaw(key: string, value: string): void {
+        this.data.set(this.prefix + key, value);
+      }
+
+      protected override removeRaw(key: string): void {
+        this.data.delete(this.prefix + key);
+      }
+    }
+    const driver = new CookieLikeDriver({ namespace: 'app' });
+
+    driver.write('k', 'v');
+
+    expect([...driver.data.keys()]).toEqual(['c_app:k']);
+  });
+
   it('is the base of the built-in drivers', () => {
     expect(new MemoryDriver()).toBeInstanceOf(BaseStorageDriver);
     expect(new WebStorageDriver(localStorage)).toBeInstanceOf(

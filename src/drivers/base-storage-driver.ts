@@ -1,8 +1,12 @@
 import { assertKey } from '../core/validation.js';
+import { StorageArgumentError } from '../errors.js';
 import type { StorageDriver } from './storage-driver.js';
 
 interface BaseStorageDriverOptions {
-  /** Prefix every key with `${namespace}:`, for backends shared with other code. */
+  /**
+   * Prefix every key with `${namespace}:`, for backends shared with other
+   * code. Must not contain ":", so two namespaces can never overlap.
+   */
   namespace?: string;
 }
 
@@ -13,24 +17,32 @@ interface BaseStorageDriverOptions {
  */
 abstract class BaseStorageDriver implements StorageDriver {
   abstract readonly name: string;
-  private readonly prefix: string;
+  // ES-private, so subclasses can declare their own `prefix`.
+  readonly #prefix: string;
 
   constructor(options: BaseStorageDriverOptions = {}) {
     const { namespace } = options;
-    if (namespace !== undefined) assertKey(namespace, 'namespace');
-    this.prefix = namespace === undefined ? '' : `${namespace}:`;
+    if (namespace !== undefined) {
+      assertKey(namespace, 'namespace');
+      if (namespace.includes(':')) {
+        throw new StorageArgumentError(
+          'namespace must not contain ":"; "app" with key "x:y" and "app:x" with key "y" would collide.'
+        );
+      }
+    }
+    this.#prefix = namespace === undefined ? '' : `${namespace}:`;
   }
 
   read(key: string): string | null {
-    return this.readRaw(this.prefix + key);
+    return this.readRaw(this.#prefix + key);
   }
 
   write(key: string, value: string): void {
-    this.writeRaw(this.prefix + key, value);
+    this.writeRaw(this.#prefix + key, value);
   }
 
   remove(key: string): void {
-    this.removeRaw(this.prefix + key);
+    this.removeRaw(this.#prefix + key);
   }
 
   /** Return the stored string, or null when there is none. */
