@@ -9,18 +9,19 @@ import { IndexedDBDriver } from './indexeddb-driver.js';
 let resolution: Resolution | undefined;
 
 /**
- * The shared 'indexeddb' driver: silent memory on the server, reported
- * memory when a browser has no IndexedDB.
+ * The shared 'indexeddb' driver: IndexedDB in browsers and workers, silent
+ * memory on a server, reported memory in a browser without IndexedDB.
  */
 function resolveIndexedDB(report: Reporter): AnyStorageDriver {
   if (!resolution) {
-    resolution = buildDriver('indexeddb', () =>
-      // `window`, not `globalThis`: Node has no IndexedDB, and the server
-      // must fall back silently.
-      typeof window === 'undefined'
-        ? new AsyncMemoryDriver()
-        : new IndexedDBDriver()
-    );
+    resolution = buildDriver('indexeddb', () => {
+      // Browsers and workers (which have no window) both have IndexedDB.
+      if (typeof indexedDB !== 'undefined') return new IndexedDBDriver();
+      // No IndexedDB: expected on a server, so fall back silently there; in
+      // a browser it is a problem worth reporting.
+      if (typeof window === 'undefined') return new AsyncMemoryDriver();
+      throw new Error('This browser has no IndexedDB.');
+    });
   }
   if (resolution.problem) report(resolution.problem);
   return resolution.driver;

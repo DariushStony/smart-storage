@@ -152,9 +152,20 @@ class DefaultAsyncVault implements AsyncVault, Retirable {
   }
 
   private perform<R>(build: () => Operation<R>): Promise<R> {
+    // Build now, as the sync vault does, so the value is copied when the
+    // method is called, not when its turn in the queue comes. A build error
+    // is held back so "disposed" still wins and nothing throws synchronously.
+    let operation: Operation<R> | undefined;
+    let invalid: { error: unknown } | undefined;
+    try {
+      operation = build();
+    } catch (error) {
+      invalid = { error };
+    }
+
     return this.queue.run(async () => {
       this.assertUsable();
-      const operation = build();
+      if (!operation) throw (invalid as { error: unknown }).error;
       const now = Date.now();
       const { result, next } = operation(await this.current(), now);
       if (next) await this.strategy.write(next.compact(now, this.maxItems));

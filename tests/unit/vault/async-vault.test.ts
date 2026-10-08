@@ -104,6 +104,32 @@ describe('createAsyncVault', () => {
   });
 });
 
+describe('call-time semantics', () => {
+  it('copies the value when set() is called, like the sync vault', async () => {
+    const { vault } = makeVault();
+    const value = { n: 1 };
+
+    const pending = vault.set('a', value);
+    value.n = 2;
+    await pending;
+
+    expect(await vault.get('a')).toEqual({ n: 1 });
+  });
+
+  it('still reports a disposed vault before an invalid argument', async () => {
+    const { vault } = makeVault();
+    await vault.dispose();
+
+    await expect(vault.set('', 1)).rejects.toThrow(StorageDisposedError);
+  });
+
+  it('names registerAsyncDriver for an unknown driver name', () => {
+    expect(() => createAsyncVault({ key: 'K', driver: 'nope' })).toThrow(
+      /registerAsyncDriver/
+    );
+  });
+});
+
 describe('ordering', () => {
   it('runs 50 concurrent writes in order without losing any', async () => {
     const { vault } = makeVault();
@@ -361,6 +387,18 @@ describe('the default IndexedDB driver', () => {
     expect(await vault.get('a')).toBe(1);
     expect((await vault.stats()).driver).toBe('memory');
     expect(onError).toHaveBeenCalledWith(expect.any(StorageUnavailableError));
+  });
+
+  // Workers have IndexedDB but no window.
+  it('uses IndexedDB in a worker, where there is no window', async () => {
+    vi.stubGlobal('window', undefined);
+    vi.stubGlobal('indexedDB', new IDBFactory());
+    const vault = createAsyncVault({ key: 'WORKER' });
+    created.push(vault);
+
+    await vault.set('a', 1);
+
+    expect((await vault.stats()).driver).toBe('indexedDB');
   });
 
   it('uses memory silently on the server', async () => {

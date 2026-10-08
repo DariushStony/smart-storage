@@ -45,11 +45,23 @@ class IndexedDBDriver extends BaseAsyncStorageDriver {
 
   private async request<T>(
     mode: IDBTransactionMode,
-    makeRequest: (store: IDBObjectStore) => IDBRequest<T>
+    makeRequest: (store: IDBObjectStore) => IDBRequest<T>,
+    retried = false
   ): Promise<T> {
     const database = await this.open();
+    let transaction: IDBTransaction;
+    try {
+      transaction = database.transaction(this.storeName, mode);
+    } catch (error) {
+      // The browser closed the connection without telling us (site data
+      // cleared, Safari's "connection lost"): reopen once and retry.
+      if (!retried && isInvalidState(error)) {
+        this.connection = null;
+        return this.request(mode, makeRequest, true);
+      }
+      throw error;
+    }
     return new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(this.storeName, mode);
       const request = makeRequest(transaction.objectStore(this.storeName));
       // Settle on the transaction, so a resolved write is durable.
       transaction.oncomplete = () => resolve(request.result);
@@ -70,10 +82,14 @@ class IndexedDBDriver extends BaseAsyncStorageDriver {
     // Forget a failed or closed connection, so the next call reopens.
     void connection.then(
       (database) => {
-        database.onversionchange = () => {
-          database.close();
+        const forget = (): void => {
           if (this.connection === connection) this.connection = null;
         };
+        database.onversionchange = () => {
+          database.close();
+          forget();
+        };
+        database.onclose = forget;
       },
       () => {
         if (this.connection === connection) this.connection = null;
@@ -90,10 +106,22 @@ function openStore(
   version?: number
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    let blocked = false;
     const request =
       version === undefined
         ? indexedDB.open(databaseName)
         : indexedDB.open(databaseName, version);
+    // Another connection is holding up the upgrade and ignoring
+    // versionchange; fail now rather than leave every vault call pending.
+    request.onblocked = () => {
+      blocked = true;
+      reject(
+        new DOMException(
+          `Upgrading "${databaseName}" to add the "${storeName}" store is blocked by another open connection.`,
+          'InvalidStateError'
+        )
+      );
+    };
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(storeName)) {
@@ -102,6 +130,10 @@ function openStore(
     };
     request.onsuccess = () => {
       const database = request.result;
+      if (blocked) {
+        database.close();
+        return;
+      }
       if (database.objectStoreNames.contains(storeName)) {
         resolve(database);
         return;
@@ -112,6 +144,14 @@ function openStore(
     };
     request.onerror = () => reject(request.error);
   });
+}
+
+function isInvalidState(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'InvalidStateError'
+  );
 }
 
 export { IndexedDBDriver };

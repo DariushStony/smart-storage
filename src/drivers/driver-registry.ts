@@ -174,7 +174,7 @@ function resolveAnyDriver(
   const registration = registrations.get(spec);
   if (!registration) {
     throw new StorageArgumentError(
-      `Unknown driver "${spec}". Register it first with registerDriver("${spec}", factory).`
+      `Unknown driver "${spec}". Register it first with registerDriver("${spec}", factory), or registerAsyncDriver for an async driver.`
     );
   }
 

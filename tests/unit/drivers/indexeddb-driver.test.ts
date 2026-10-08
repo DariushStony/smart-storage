@@ -1,4 +1,8 @@
-import { IDBObjectStore as FakeObjectStore, IDBFactory } from 'fake-indexeddb';
+import {
+  IDBObjectStore as FakeObjectStore,
+  IDBFactory,
+  forceCloseDatabase,
+} from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IndexedDBDriver } from '../../../src/drivers/indexeddb-driver.js';
@@ -94,6 +98,51 @@ describe('IndexedDBDriver', () => {
     await expect(driver.write('k', 'v')).rejects.toMatchObject({
       name: 'QuotaExceededError',
     });
+  });
+
+  // Site data cleared, or Safari's "Connection to Indexed Database server lost".
+  it('reopens after the browser closes its connection', async () => {
+    const driver = new IndexedDBDriver({ databaseName: 'lost' });
+    await driver.write('k', 'v');
+    const connection = (
+      driver as unknown as { connection: Promise<IDBDatabase> | null }
+    ).connection;
+    if (!connection) throw new Error('expected an open connection');
+    // fake-indexeddb types this parameter as the class rather than an instance.
+    forceCloseDatabase(
+      (await connection) as unknown as Parameters<typeof forceCloseDatabase>[0]
+    );
+
+    expect(await driver.read('k')).toBe('v');
+  });
+
+  it('rejects instead of hanging when an upgrade is blocked by another connection', async () => {
+    const other = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('blocked');
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('other');
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    // Ignores versionchange, like many IndexedDB wrappers do by default.
+    other.onversionchange = null;
+
+    await expect(
+      new IndexedDBDriver({ databaseName: 'blocked' }).read('k')
+    ).rejects.toThrow(/blocked/);
+    other.close();
+  });
+
+  it('keeps namespaces apart in one store', async () => {
+    const a = new IndexedDBDriver({ databaseName: 'ns', namespace: 'a' });
+    const b = new IndexedDBDriver({ databaseName: 'ns', namespace: 'b' });
+
+    await a.write('k', 'from a');
+    await b.write('k', 'from b');
+
+    expect(await a.read('k')).toBe('from a');
+    expect(await b.read('k')).toBe('from b');
   });
 
   it('throws on construction where IndexedDB does not exist', () => {
