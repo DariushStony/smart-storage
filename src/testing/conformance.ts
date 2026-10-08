@@ -1,3 +1,5 @@
+import { isThenable } from '../core/thenable.js';
+
 type MaybePromise<T> = T | Promise<T>;
 
 /** The surface the checks touch; sync and async drivers both fit it. */
@@ -92,14 +94,6 @@ function same(actual: unknown, expected: unknown, what: string): void {
       `${what}: expected ${show(expected)}, got ${show(actual)}.`
     );
   }
-}
-
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { then?: unknown }).then === 'function'
-  );
 }
 
 function largeValue(length: number): string {
@@ -276,6 +270,28 @@ const SYNC_CHECK: Check = {
   },
 };
 
+const ASYNC_CHECK: Check = {
+  rule: 'async',
+  description: 'read, write and remove return Promises',
+  run: async (driver, keys) => {
+    const key = keys.key(`${P}async`);
+    const calls: Array<[string, () => unknown]> = [
+      ['write', () => driver.write(key, 'value')],
+      ['read', () => driver.read(key)],
+      ['remove', () => driver.remove(key)],
+    ];
+    for (const [method, call] of calls) {
+      const result = call();
+      if (!isThenable(result)) {
+        throw new ContractViolation(
+          `${method} returned ${show(result)}; an async driver must return a Promise.`
+        );
+      }
+      await result;
+    }
+  },
+};
+
 async function runConformance(
   create: () => MaybePromise<CheckedDriver>,
   modeCheck: Check,
@@ -343,7 +359,13 @@ function formatFailures(report: ConformanceReport): string {
   return `Driver "${report.driver}" breaks ${String(failed.length)} contract rule(s):\n${lines.join('\n')}`;
 }
 
-export { runConformance, formatFailures, SYNC_CHECK, ContractViolation };
+export {
+  runConformance,
+  formatFailures,
+  SYNC_CHECK,
+  ASYNC_CHECK,
+  ContractViolation,
+};
 export type {
   Check,
   CheckedDriver,

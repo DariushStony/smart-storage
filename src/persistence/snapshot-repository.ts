@@ -1,13 +1,17 @@
 import { utf8ByteLength } from '../core/byte-size.js';
 import { Snapshot } from '../core/snapshot.js';
 import type { StorageDriver } from '../drivers/storage-driver.js';
-import {
-  StorageAccessError,
-  StorageCorruptionError,
-  StorageQuotaError,
-} from '../errors.js';
+import { isThenable } from '../core/thenable.js';
+import { StorageArgumentError } from '../errors.js';
 import type { Reporter } from '../reporting/reporter.js';
 import type { SnapshotFormat, SnapshotStore } from './snapshot-store.js';
+import {
+  accessFailure,
+  assertFits,
+  skipped,
+  unreadable,
+  writeFailure,
+} from './store-policy.js';
 
 interface RepositoryDeps {
   driver: StorageDriver;
@@ -56,42 +60,28 @@ class SnapshotRepository implements SnapshotStore {
   save(snapshot: Snapshot): void {
     const raw = this.serializer.serialize(snapshot);
     const bytes = utf8ByteLength(raw);
-    // Stored data may already be over the limit (written by 1.x, or under a
-    // higher limit). Writes that do not grow it must pass, or it could
-    // never be shrunk.
-    if (bytes > this.maxBytes && bytes > this.storedBytes()) {
-      throw new StorageQuotaError(
-        `"${this.key}" would be ${String(bytes)} bytes, over its ${String(this.maxBytes)}-byte limit.`,
-        { bytes, maxBytes: this.maxBytes }
-      );
-    }
+    assertFits(this.key, bytes, this.storedBytes(), this.maxBytes);
 
+    let result: unknown;
     try {
-      this.driver.write(this.key, raw);
+      result = this.driver.write(this.key, raw);
     } catch (error) {
-      if (isQuotaError(error)) {
-        throw new StorageQuotaError(
-          `The browser's storage quota is full; "${this.key}" was not saved.`,
-          { cause: error, bytes }
-        );
-      }
-      throw new StorageAccessError(`Writing "${this.key}" failed.`, {
-        cause: error,
-      });
+      throw writeFailure(this.key, bytes, error);
     }
+    this.assertSync(result);
 
     this.cachedRaw = raw;
     this.cached = snapshot;
   }
 
   remove(): void {
+    let result: unknown;
     try {
-      this.driver.remove(this.key);
+      result = this.driver.remove(this.key);
     } catch (error) {
-      throw new StorageAccessError(`Removing "${this.key}" failed.`, {
-        cause: error,
-      });
+      throw accessFailure('Removing', this.key, error);
     }
+    this.assertSync(result);
     this.cachedRaw = null;
     this.cached = Snapshot.empty;
   }
@@ -106,49 +96,38 @@ class SnapshotRepository implements SnapshotStore {
   }
 
   private readRaw(): string | null {
+    let raw: string | null;
     try {
-      return this.driver.read(this.key);
+      raw = this.driver.read(this.key);
     } catch (error) {
-      throw new StorageAccessError(`Reading "${this.key}" failed.`, {
-        cause: error,
-      });
+      throw accessFailure('Reading', this.key, error);
+    }
+    this.assertSync(raw);
+    return raw;
+  }
+
+  private assertSync(result: unknown): void {
+    if (isThenable(result)) {
+      // Settle it so it cannot surface as an unhandled rejection.
+      result.then(undefined, () => undefined);
+      throw new StorageArgumentError(
+        `The "${this.driver.name}" driver is asynchronous; use createAsyncVault() with it.`
+      );
     }
   }
 
   private decode(raw: string): Snapshot {
     try {
       const { snapshot, dropped } = this.serializer.deserialize(raw);
-      if (dropped > 0) {
-        this.report(
-          new StorageCorruptionError(
-            `Skipped ${String(dropped)} unreadable item(s) in "${this.key}".`
-          )
-        );
-      }
+      if (dropped > 0) this.report(skipped(this.key, dropped));
       return snapshot;
     } catch (error) {
-      this.report(
-        new StorageCorruptionError(
-          `Stored data for "${this.key}" is unreadable and was ignored; the next write replaces it.`,
-          { cause: error }
-        )
-      );
+      // Misuse (an async codec) is the caller's to fix, not corruption.
+      if (error instanceof StorageArgumentError) throw error;
+      this.report(unreadable(this.key, error));
       return Snapshot.empty;
     }
   }
-}
-
-// Duck-typed: DOMException may not exist on the server, and browsers differ
-// in name and legacy code (22 in most, 1014 in old Firefox).
-function isQuotaError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const { name, code } = error as { name?: unknown; code?: unknown };
-  return (
-    name === 'QuotaExceededError' ||
-    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-    code === 22 ||
-    code === 1014
-  );
 }
 
 export { SnapshotRepository };

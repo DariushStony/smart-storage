@@ -1,7 +1,15 @@
 interface Retirable {
   /** Flushes, detaches and makes later calls throw with `reason`. */
-  retire(reason: string): void;
+  retire(reason: string): void | Promise<void>;
 }
+
+interface ClaimResult {
+  replaced: boolean;
+  /** Settles once the replaced vault has flushed; never rejects. */
+  retired: Promise<void>;
+}
+
+const noop = (): void => undefined;
 
 /**
  * Tracks which vault owns each (storage, key) pair. "Storage" is a scope
@@ -14,13 +22,13 @@ interface Retirable {
 class VaultRegistry {
   private readonly owners = new WeakMap<object, Map<string, Retirable>>();
 
-  /** Returns true when a previous owner was replaced. */
+  /** Makes `vault` the owner of the key, retiring any previous owner. */
   claim(
     scope: object,
     key: string,
     vault: Retirable,
     driverName: string
-  ): boolean {
+  ): ClaimResult {
     let byKey = this.owners.get(scope);
     if (!byKey) {
       byKey = new Map();
@@ -29,10 +37,14 @@ class VaultRegistry {
 
     const previous = byKey.get(key);
     byKey.set(key, vault);
-    previous?.retire(
-      `Another vault took over "${key}" on ${driverName}; use the newer instance.`
-    );
-    return previous !== undefined;
+    if (!previous) return { replaced: false, retired: Promise.resolve() };
+
+    const retired = Promise.resolve(
+      previous.retire(
+        `Another vault took over "${key}" on ${driverName}; use the newer instance.`
+      )
+    ).then(noop, noop);
+    return { replaced: true, retired };
   }
 
   release(scope: object, key: string, vault: Retirable): void {
@@ -41,5 +53,9 @@ class VaultRegistry {
   }
 }
 
-export { VaultRegistry };
-export type { Retirable };
+// One per loaded package copy, shared by sync and async vaults, so the two
+// kinds detect each other on the same key.
+const vaultRegistry = new VaultRegistry();
+
+export { VaultRegistry, vaultRegistry };
+export type { Retirable, ClaimResult };

@@ -7,7 +7,10 @@ describe('package exports', () => {
     // Guards the README's API section against drift.
     expect(Object.keys(api).sort()).toEqual(
       [
+        'AsyncMemoryDriver',
+        'BaseAsyncStorageDriver',
         'BaseStorageDriver',
+        'IndexedDBDriver',
         'MemoryDriver',
         'StorageAccessError',
         'StorageArgumentError',
@@ -19,7 +22,9 @@ describe('package exports', () => {
         'StorageSerializationError',
         'StorageUnavailableError',
         'WebStorageDriver',
+        'createAsyncVault',
         'createVault',
+        'registerAsyncDriver',
         'registerDriver',
         'unregisterDriver',
       ].sort()
@@ -56,7 +61,9 @@ describe('testing entry', () => {
   it('exports exactly the kit', async () => {
     const testing = await import('../../src/testing/index.js');
     expect(Object.keys(testing).sort()).toEqual([
+      'assertAsyncStorageDriver',
       'assertStorageDriver',
+      'verifyAsyncStorageDriver',
       'verifyStorageDriver',
     ]);
   });

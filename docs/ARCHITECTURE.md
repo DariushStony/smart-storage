@@ -42,29 +42,41 @@ write strategy is in use.
 
 ## Units
 
-| Unit                              | Does                                                                       | Depends on                             |
-| --------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
-| `errors.ts`                       | `StorageError` and its subclasses, each with a stable `code`               | —                                      |
-| `core/entry.ts`                   | `Entry` (value as JSON text + `expiresAt`), expiry math, `toJson`          | errors                                 |
-| `core/snapshot.ts`                | Immutable map of entries; `with`, `without`, `live`, `compact`             | entry                                  |
-| `core/envelope.ts`                | Encode format v2; decode v2 and 1.x                                        | snapshot                               |
-| `core/validation.ts`              | Key, TTL and option checks                                                 | errors                                 |
-| `core/byte-size.ts`               | UTF-8 length without allocating                                            | —                                      |
-| `codec/codec.ts`                  | `Codec` interface and `composeCodecs`                                      | —                                      |
-| `drivers/storage-driver.ts`       | The `StorageDriver` port and its contract; `isStorageDriver` guard         | —                                      |
-| `drivers/base-storage-driver.ts`  | `BaseStorageDriver`: Template Method with optional key namespace           | port, validation                       |
-| `drivers/web-storage-driver.ts`   | Adapter for `localStorage` / `sessionStorage`                              | base driver                            |
-| `drivers/memory-driver.ts`        | `Map` adapter for SSR and tests                                            | base driver                            |
-| `drivers/driver-registry.ts`      | Name → driver factory; built-ins and custom drivers alike; memory fallback | adapters, errors                       |
-| `persistence/snapshot-serializer` | Snapshot ↔ stored string (envelope + codecs), pure                         | core, codec                            |
-| `persistence/snapshot-store.ts`   | `SnapshotStore` and `SnapshotFormat` interfaces the vault depends on       | core                                   |
-| `persistence/snapshot-repository` | Load/save via a driver; raw-string cache; `maxBytes`; quota → typed error  | `SnapshotFormat`, port, errors         |
-| `persistence/write-strategy`      | `ImmediateWriteStrategy`, `DebouncedWriteStrategy`                         | `SnapshotStore`, lifecycle             |
-| `persistence/page-lifecycle`      | `pagehide` / `visibilitychange` subscription; no-op on the server          | —                                      |
-| `reporting/reporter.ts`           | Calls `onError`, swallowing anything it throws                             | errors                                 |
-| `vault/default-vault.ts`          | The `Vault` facade: one read path, one write path                          | `SnapshotStore`, `WriteStrategy`, core |
-| `vault/registry.ts`               | One live vault per (driver, key); newer takes over                         | port                                   |
-| `vault/create-vault.ts`           | Composition root                                                           | everything                             |
+| Unit                                   | Does                                                                            | Depends on                              |
+| -------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------- |
+| `errors.ts`                            | `StorageError` and its subclasses, each with a stable `code`                    | —                                       |
+| `core/entry.ts`                        | `Entry` (value as JSON text + `expiresAt`), expiry math, `toJson`               | errors                                  |
+| `core/snapshot.ts`                     | Immutable map of entries; `with`, `without`, `live`, `compact`                  | entry                                   |
+| `core/envelope.ts`                     | Encode format v2; decode v2 and 1.x                                             | snapshot                                |
+| `core/validation.ts`                   | Key, TTL and option checks                                                      | errors                                  |
+| `core/byte-size.ts`                    | UTF-8 length without allocating                                                 | —                                       |
+| `codec/codec.ts`                       | `Codec` interface and `composeCodecs`                                           | —                                       |
+| `drivers/storage-driver.ts`            | The `StorageDriver` port and its contract; `isStorageDriver` guard              | —                                       |
+| `drivers/base-storage-driver.ts`       | `BaseStorageDriver`: Template Method with optional key namespace                | port, validation                        |
+| `drivers/web-storage-driver.ts`        | Adapter for `localStorage` / `sessionStorage`                                   | base driver                             |
+| `drivers/memory-driver.ts`             | `Map` adapter for SSR and tests                                                 | base driver                             |
+| `drivers/driver-registry.ts`           | Name → driver factory; built-ins and custom drivers alike; memory fallback      | adapters, errors                        |
+| `persistence/snapshot-serializer`      | Snapshot ↔ stored string (envelope + codecs), pure                              | core, codec                             |
+| `persistence/snapshot-store.ts`        | `SnapshotStore` and `SnapshotFormat` interfaces the vault depends on            | core                                    |
+| `persistence/snapshot-repository`      | Load/save via a driver; raw-string cache; `maxBytes`; quota → typed error       | `SnapshotFormat`, port, errors          |
+| `persistence/write-strategy`           | `ImmediateWriteStrategy`, `DebouncedWriteStrategy`                              | `SnapshotStore`, lifecycle              |
+| `persistence/page-lifecycle`           | `pagehide` / `visibilitychange` subscription; no-op on the server               | —                                       |
+| `reporting/reporter.ts`                | Calls `onError`, swallowing anything it throws                                  | errors                                  |
+| `vault/default-vault.ts`               | The `Vault` facade: one read path, one write path                               | `SnapshotStore`, `WriteStrategy`, core  |
+| `drivers/async-storage-driver.ts`      | The `AsyncStorageDriver` port (Promises)                                        | —                                       |
+| `drivers/base-async-storage-driver.ts` | `BaseAsyncStorageDriver`: async Template Method with namespace                  | base driver                             |
+| `drivers/async-memory-driver.ts`       | Reference async driver (`Map` behind Promises)                                  | async base driver                       |
+| `drivers/indexeddb-driver.ts`          | `IndexedDBDriver`: lazy open, store upgrade, `versionchange` handling           | async base driver                       |
+| `drivers/indexeddb-builtin.ts`         | Resolves `'indexeddb'` (memory fallback), outside the registry for tree-shaking | `IndexedDBDriver`, registry             |
+| `codec/async-codec.ts`                 | `AsyncCodec`, `composeAsyncCodecs`                                              | —                                       |
+| `persistence/store-policy.ts`          | Size, quota and corruption rules shared by both repositories                    | errors                                  |
+| `persistence/async-*`                  | Async serializer, repository and write strategies                               | `AsyncSnapshotStore`, queue             |
+| `vault/operations.ts`                  | Pure, validated operations both vaults apply                                    | core                                    |
+| `vault/operation-queue.ts`             | Runs async calls one at a time, in order                                        | —                                       |
+| `vault/default-async-vault.ts`         | The `AsyncVault` facade                                                         | operations, queue, `AsyncSnapshotStore` |
+| `vault/create-async-vault.ts`          | Async composition root                                                          | everything async                        |
+| `vault/registry.ts`                    | One live vault per (driver, key); newer takes over                              | port                                    |
+| `vault/create-vault.ts`                | Composition root                                                                | everything                              |
 
 ## Extending with new storage
 
@@ -81,6 +93,33 @@ implementer's guide is [CUSTOM_STORAGE.md](./CUSTOM_STORAGE.md).
 Inside the package, `DefaultVault` and the write strategies depend on the
 `SnapshotStore` interface and the repository depends on `SnapshotFormat`, so
 only `create-vault.ts` names concrete classes (dependency inversion).
+
+## Sync and async vaults
+
+`createVault` and `createAsyncVault` build two thin facades over shared
+parts:
+
+- **Decisions** live in `vault/operations.ts` as pure `Operation`s. Each
+  takes a snapshot and `now`, and returns a result plus the snapshot to
+  commit. A facade only loads, applies and commits, so both vaults behave the
+  same by construction.
+- **Persistence** is mirrored: `SnapshotRepository` / `AsyncSnapshotRepository`,
+  `SnapshotSerializer` / `AsyncSnapshotSerializer`, and the two pairs of write
+  strategies. The size, quota and corruption rules live once, in
+  `persistence/store-policy.ts`.
+- **Ordering:** the async vault runs every call through an `OperationQueue`,
+  so concurrent calls never interleave. The debounced async strategy sends
+  its timed and page-hide flushes through the same queue.
+- **Any driver:** the async repository awaits every driver call, so sync
+  drivers work unchanged. The sync repository refuses a driver that returns
+  Promises.
+- **One registry:** both vault kinds share `vaultRegistry`, so they detect
+  each other on one key. When an async vault takes over, its first call waits
+  for the retired vault's flush (`claim().retired`).
+- **IndexedDB is tree-shakeable:** `'indexeddb'` is resolved in
+  `drivers/indexeddb-builtin.ts`, which only `createAsyncVault` imports. An
+  app that imports only `createVault` ships no IndexedDB or async code;
+  size-limit checks this.
 
 ## Data flow
 
@@ -112,9 +151,6 @@ rethrows a pending failure.
 
 Not implemented, but the design leaves room for them:
 
-- **Async drivers (IndexedDB) and async codecs (Web Crypto):** add an
-  `AsyncStorageDriver`, an async repository and an `AsyncVault`; `core/*`,
-  `codec/*` and `SnapshotSerializer` are reused unchanged.
 - **Change events:** emit from `DefaultVault.commit`, diffing the old and new
   snapshots.
 - **Cross-tab sync:** an optional `subscribe` capability on drivers (the web

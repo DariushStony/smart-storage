@@ -9,8 +9,14 @@
  *   await assertStorageDriver(() => new MyDriver());
  * });
  */
+import type { AsyncStorageDriver } from '../drivers/async-storage-driver.js';
 import type { StorageDriver } from '../drivers/storage-driver.js';
-import { SYNC_CHECK, formatFailures, runConformance } from './conformance.js';
+import {
+  ASYNC_CHECK,
+  SYNC_CHECK,
+  formatFailures,
+  runConformance,
+} from './conformance.js';
 import type {
   ConformanceCheck,
   ConformanceReport,
@@ -34,5 +40,27 @@ async function assertStorageDriver(
   if (!report.passed) throw new Error(formatFailures(report));
 }
 
-export { verifyStorageDriver, assertStorageDriver };
+/** Runs every contract check against async drivers from `create`. */
+function verifyAsyncStorageDriver(
+  create: () => AsyncStorageDriver,
+  options?: VerifyOptions
+): Promise<ConformanceReport> {
+  return runConformance(create, ASYNC_CHECK, options);
+}
+
+/** Like verifyAsyncStorageDriver, but throws an Error listing every broken rule. */
+async function assertAsyncStorageDriver(
+  create: () => AsyncStorageDriver,
+  options?: VerifyOptions
+): Promise<void> {
+  const report = await verifyAsyncStorageDriver(create, options);
+  if (!report.passed) throw new Error(formatFailures(report));
+}
+
+export {
+  verifyStorageDriver,
+  assertStorageDriver,
+  verifyAsyncStorageDriver,
+  assertAsyncStorageDriver,
+};
 export type { ConformanceCheck, ConformanceReport, VerifyOptions };

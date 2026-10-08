@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
+import { AsyncMemoryDriver } from '../../../src/drivers/async-memory-driver.js';
 import {
+  registerAsyncDriver,
   registerDriver,
   resetDriverRegistry,
+  resolveAnyDriver,
   resolveDriver,
   unregisterDriver,
 } from '../../../src/drivers/driver-registry.js';
@@ -195,5 +198,33 @@ describe('unregisterDriver', () => {
 describe('resolveDriver', () => {
   it('points at registerDriver when a name is unknown', () => {
     expect(() => resolveDriver('nope', report)).toThrow(/registerDriver/);
+  });
+});
+
+describe('async drivers', () => {
+  it('registerAsyncDriver makes an async driver resolvable for async vaults', () => {
+    const driver = new AsyncMemoryDriver();
+    registerAsyncDriver('remote', () => driver);
+
+    expect(resolveAnyDriver('remote', report)).toBe(driver);
+  });
+
+  it('resolveAnyDriver also resolves sync names', () => {
+    expect(resolveAnyDriver('memory', report)).toBeInstanceOf(MemoryDriver);
+  });
+
+  it('resolveDriver (createVault) refuses async names and indexeddb', () => {
+    registerAsyncDriver('remote', () => new AsyncMemoryDriver());
+
+    expect(() => resolveDriver('remote', report)).toThrow(/createAsyncVault/);
+    expect(() => resolveDriver('indexeddb', report)).toThrow(
+      /createAsyncVault/
+    );
+  });
+
+  it('reserves indexeddb', () => {
+    expect(() =>
+      registerAsyncDriver('indexeddb', () => new AsyncMemoryDriver())
+    ).toThrow(StorageArgumentError);
   });
 });

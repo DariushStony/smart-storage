@@ -1,15 +1,21 @@
-import { expiryAfter, remainingTtl, toJson } from '../core/entry.js';
-import type { Entry } from '../core/entry.js';
 import type { Snapshot } from '../core/snapshot.js';
-import { assertKey, assertPositive } from '../core/validation.js';
-import {
-  StorageArgumentError,
-  StorageDisposedError,
-  toStorageError,
-} from '../errors.js';
+import { StorageDisposedError, toStorageError } from '../errors.js';
 import type { SnapshotStore } from '../persistence/snapshot-store.js';
 import type { WriteStrategy } from '../persistence/write-strategy.js';
 import type { Reporter } from '../reporting/reporter.js';
+import {
+  extendOp,
+  getOp,
+  hasOp,
+  keysOp,
+  purgeExpiredOp,
+  removeOp,
+  setOp,
+  toObjectOp,
+  ttlOp,
+  updateOp,
+} from './operations.js';
+import type { Operation } from './operations.js';
 import type { Retirable } from './registry.js';
 import type { SetOptions, Vault, VaultStats } from './vault.js';
 
@@ -49,72 +55,39 @@ class DefaultVault implements Vault, Retirable {
   }
 
   get<T>(key: string): T | null {
-    const entry = this.find(key, Date.now());
-    return entry ? (JSON.parse(entry.json) as T) : null;
+    return this.run(() => getOp<T>(key));
   }
 
-  set<T>(key: string, value: T, options: SetOptions = {}): void {
-    this.assertUsable();
-    assertKey(key);
-    if (typeof (options as unknown) !== 'object' || options === null) {
-      throw new StorageArgumentError('set() options must be an object.');
-    }
-    const { ttl } = options;
-    if (ttl !== undefined) assertPositive('ttl', ttl);
-    const json = toJson(value);
-
-    const now = Date.now();
-    const expiresAt = ttl === undefined ? null : expiryAfter(now, ttl);
-    this.commit(this.current().with(key, { json, expiresAt }), now);
+  set<T>(key: string, value: T, options?: SetOptions): void {
+    this.run(() => setOp(key, value, options));
   }
 
   has(key: string): boolean {
-    return this.find(key, Date.now()) !== undefined;
+    return this.run(() => hasOp(key));
   }
 
   update<T>(key: string, value: T): boolean {
-    this.assertUsable();
-    const json = toJson(value);
-    return this.rewrite(key, (entry) => ({ json, expiresAt: entry.expiresAt }));
+    return this.run(() => updateOp(key, value));
   }
 
   extend(key: string, ms: number): boolean {
-    this.assertUsable();
-    assertPositive('ms', ms);
-    return this.rewrite(key, (entry) =>
-      entry.expiresAt === null
-        ? entry
-        : { json: entry.json, expiresAt: expiryAfter(entry.expiresAt, ms) }
-    );
+    return this.run(() => extendOp(key, ms));
   }
 
   ttl(key: string): number | null {
-    const now = Date.now();
-    const entry = this.find(key, now);
-    return entry ? remainingTtl(entry, now) : null;
+    return this.run(() => ttlOp(key));
   }
 
   remove(key: string): boolean {
-    this.assertUsable();
-    assertKey(key);
-    const now = Date.now();
-    const snapshot = this.current();
-    if (!snapshot.get(key, now)) return false;
-    this.commit(snapshot.without(key), now);
-    return true;
+    return this.run(() => removeOp(key));
   }
 
   keys(): string[] {
-    return this.liveEntries().map(([key]) => key);
+    return this.run(keysOp);
   }
 
   toObject(): Record<string, unknown> {
-    return Object.fromEntries(
-      this.liveEntries().map(([key, entry]) => [
-        key,
-        JSON.parse(entry.json) as unknown,
-      ])
-    );
+    return this.run(toObjectOp);
   }
 
   clear(): void {
@@ -125,13 +98,7 @@ class DefaultVault implements Vault, Retirable {
   }
 
   purgeExpired(): number {
-    this.assertUsable();
-    const now = Date.now();
-    const snapshot = this.current();
-    const purged = snapshot.withoutExpired(now);
-    if (purged === snapshot) return 0;
-    this.commit(purged, now);
-    return snapshot.size - purged.size;
+    return this.run(purgeExpiredOp);
   }
 
   flush(): void {
@@ -173,36 +140,22 @@ class DefaultVault implements Vault, Retirable {
     this.onDispose();
   }
 
+  /** Checks usability, builds (and so validates) the operation, then applies it. */
+  private run<R>(build: () => Operation<R>): R {
+    this.assertUsable();
+    const operation = build();
+    const now = Date.now();
+    const { result, next } = operation(this.current(), now);
+    if (next) this.commit(next, now);
+    return result;
+  }
+
   private current(): Snapshot {
     return this.strategy.pending() ?? this.repository.load();
   }
 
   private commit(next: Snapshot, now: number): void {
     this.strategy.write(next.compact(now, this.maxItems));
-  }
-
-  private find(key: string, now: number): Entry | undefined {
-    this.assertUsable();
-    assertKey(key);
-    return this.current().get(key, now);
-  }
-
-  private liveEntries(): Array<[string, Entry]> {
-    this.assertUsable();
-    return this.current().live(Date.now());
-  }
-
-  private rewrite(key: string, change: (entry: Entry) => Entry): boolean {
-    this.assertUsable();
-    assertKey(key);
-    const now = Date.now();
-    const snapshot = this.current();
-    const entry = snapshot.get(key, now);
-    if (!entry) return false;
-
-    const next = change(entry);
-    if (next !== entry) this.commit(snapshot.with(key, next), now);
-    return true;
   }
 
   private assertUsable(): void {

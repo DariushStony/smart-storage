@@ -12,10 +12,8 @@ import type { WriteStrategy } from '../persistence/write-strategy.js';
 import { createReporter } from '../reporting/reporter.js';
 import { DefaultVault } from './default-vault.js';
 import { resolveOptions } from './options.js';
-import { VaultRegistry } from './registry.js';
+import { vaultRegistry } from './registry.js';
 import type { Vault, VaultOptions } from './vault.js';
-
-const registry = new VaultRegistry();
 
 /**
  * Creates a vault over one storage key. Create it once and share the
@@ -57,10 +55,10 @@ function createVault(options: VaultOptions): Vault {
     maxItems: config.maxItems,
     maxBytes: config.maxBytes,
     report,
-    onDispose: () => registry.release(scope, config.key, vault),
+    onDispose: () => vaultRegistry.release(scope, config.key, vault),
   });
 
-  if (registry.claim(scope, config.key, vault, driver.name)) {
+  if (vaultRegistry.claim(scope, config.key, vault, driver.name).replaced) {
     report(
       new StorageConflictError(
         `A vault for "${config.key}" on ${driver.name} already existed; it was disposed and this one replaces it.`

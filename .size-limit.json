@@ -1,7 +1,13 @@
 [
   {
-    "name": "Full Package (ESM)",
+    "name": "createVault only (sync, tree-shaken)",
     "path": "dist/index.js",
+    "import": "{ createVault }",
     "limit": "5 KB"
+  },
+  {
+    "name": "Full package (ESM)",
+    "path": "dist/index.js",
+    "limit": "10 KB"
   }
 ]
