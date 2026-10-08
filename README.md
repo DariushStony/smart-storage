@@ -257,7 +257,7 @@ const toBase64 = (bytes: Uint8Array): string => {
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 };
-const fromBase64 = (text: string): Uint8Array =>
+const fromBase64 = (text: string): Uint8Array<ArrayBuffer> =>
   Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
 function aesGcm(key: CryptoKey): AsyncCodec {
@@ -287,9 +287,40 @@ function aesGcm(key: CryptoKey): AsyncCodec {
 const secrets = createAsyncVault({ key: 'NOTES', codecs: [aesGcm(key)] });
 ```
 
-This hides data from someone reading storage, but not from scripts running
-on your page, which can use the same key. The security warning above still
-applies.
+The `CryptoKey` must be the same on every page load: for example, derive it
+from a user's passphrase with PBKDF2, or keep a non-extractable key in
+IndexedDB. With a new key each time, stored data can't be decrypted: the
+vault reports `StorageCorruptionError` and the next write replaces it.
+
+Encryption hides data from someone reading storage, but not from scripts
+running on your page, which can use the same key. The security warning above
+still applies.
+
+### IndexedDB options
+
+`'indexeddb'` uses one shared `IndexedDBDriver` with database
+`smart-storage` and object store `keyval`. For a different database or
+store, create the driver yourself:
+
+```ts
+import {
+  IndexedDBDriver,
+  createAsyncVault,
+  registerAsyncDriver,
+} from '@dariushstony/smart-storage';
+
+registerAsyncDriver(
+  'app-db',
+  () => new IndexedDBDriver({ databaseName: 'my-app', storeName: 'vaults' })
+);
+export const drafts = createAsyncVault({ key: 'DRAFTS', driver: 'app-db' });
+```
+
+A missing store is added to an existing database by upgrading it. If
+another open connection blocks that upgrade, the call rejects instead of
+waiting forever. Registering the driver, rather than constructing it at
+module load, keeps server rendering safe: the factory's error becomes a
+memory fallback.
 
 ---
 

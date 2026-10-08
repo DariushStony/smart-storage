@@ -33,5 +33,7 @@ operations at once, and must not grow the bundle of apps that only use
 Both vaults behave identically by construction, and concurrent async calls
 cannot interleave. Importing only `createVault` stays under 5 kB. Debounced
 flushes on page hide are best-effort for async drivers, because the browser
-may end the page first. A sync vault that takes over from an async one cannot
-wait for the async flush; the conflict is reported and the last writer wins.
+may end the page first. A sync vault that takes over from a debounced async one cannot wait for the
+async flush. That flush may land after the sync vault's first writes and
+overwrite them. The conflict is reported; don't use one key from both vault
+kinds.
