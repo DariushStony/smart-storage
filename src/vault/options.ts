@@ -1,3 +1,4 @@
+import type { AsyncCodec } from '../codec/async-codec.js';
 import type { Codec } from '../codec/codec.js';
 import {
   assertKey,
@@ -9,6 +10,7 @@ import type { DriverSpec } from '../drivers/driver-registry.js';
 import { isStorageDriver } from '../drivers/storage-driver.js';
 import { StorageArgumentError } from '../errors.js';
 import type { StorageError } from '../errors.js';
+import type { AsyncDriverSpec, AsyncVaultOptions } from './async-vault.js';
 import type { VaultOptions } from './vault.js';
 
 const DEFAULT_MAX_BYTES = 4_000_000;
@@ -25,10 +27,21 @@ const LEGACY_OPTIONS: Record<string, string> = {
   transformChain: 'codecs',
 };
 
-interface ResolvedOptions {
+/** The options both vault kinds accept, generic over driver and codec types. */
+interface OptionsShape<D, C> {
   key: string;
-  driver: DriverSpec;
-  codecs: readonly Codec[];
+  driver?: D;
+  codecs?: readonly C[];
+  debounceMs?: number;
+  maxBytes?: number;
+  maxItems?: number;
+  onError?: (error: StorageError) => void;
+}
+
+interface ResolvedOptions<D = DriverSpec, C = Codec> {
+  key: string;
+  driver: D;
+  codecs: readonly C[];
   debounceMs: number;
   maxBytes: number;
   maxItems: number;
@@ -36,10 +49,23 @@ interface ResolvedOptions {
 }
 
 function resolveOptions(options: VaultOptions): ResolvedOptions {
+  return resolveCommon(options, 'local');
+}
+
+function resolveAsyncOptions(
+  options: AsyncVaultOptions
+): ResolvedOptions<AsyncDriverSpec, AsyncCodec> {
+  return resolveCommon(options, 'indexeddb');
+}
+
+function resolveCommon<D, C>(
+  options: OptionsShape<D, C>,
+  defaultDriver: D
+): ResolvedOptions<D, C> {
   // Checked at runtime because JavaScript callers get no type checking.
   if (typeof (options as unknown) !== 'object' || options === null) {
     throw new StorageArgumentError(
-      'createVault() needs an options object, e.g. createVault({ key: "APP" }).'
+      'Vault options must be an object, e.g. { key: "APP" }.'
     );
   }
 
@@ -53,7 +79,7 @@ function resolveOptions(options: VaultOptions): ResolvedOptions {
 
   const {
     key,
-    driver = 'local',
+    driver = defaultDriver,
     codecs = [],
     debounceMs = 0,
     maxBytes = DEFAULT_MAX_BYTES,
@@ -103,5 +129,5 @@ function assertCodecs(codecs: unknown): void {
   }
 }
 
-export { resolveOptions, DEFAULT_MAX_BYTES };
+export { resolveOptions, resolveAsyncOptions, DEFAULT_MAX_BYTES };
 export type { ResolvedOptions };

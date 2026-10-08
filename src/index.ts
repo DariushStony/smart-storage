@@ -10,10 +10,18 @@
  */
 
 export { createVault } from './vault/create-vault.js';
+export { createAsyncVault } from './vault/create-async-vault.js';
 export { MemoryDriver } from './drivers/memory-driver.js';
 export { WebStorageDriver } from './drivers/web-storage-driver.js';
 export { BaseStorageDriver } from './drivers/base-storage-driver.js';
-export { registerDriver, unregisterDriver } from './drivers/driver-registry.js';
+export { BaseAsyncStorageDriver } from './drivers/base-async-storage-driver.js';
+export { AsyncMemoryDriver } from './drivers/async-memory-driver.js';
+export { IndexedDBDriver } from './drivers/indexeddb-driver.js';
+export {
+  registerDriver,
+  registerAsyncDriver,
+  unregisterDriver,
+} from './drivers/driver-registry.js';
 export {
   StorageError,
   StorageArgumentError,
@@ -37,8 +45,18 @@ export type { StorageDriver } from './drivers/storage-driver.js';
 export type {
   DriverSpec,
   DriverFactory,
+  AsyncDriverFactory,
   RegisterDriverOptions,
 } from './drivers/driver-registry.js';
+export type {
+  AsyncVault,
+  AsyncVaultOptions,
+  AsyncDriverSpec,
+} from './vault/async-vault.js';
+export type { AsyncStorageDriver } from './drivers/async-storage-driver.js';
+export type { AsyncCodec } from './codec/async-codec.js';
+export type { IndexedDBDriverOptions } from './drivers/indexeddb-driver.js';
+export type { BaseAsyncStorageDriverOptions } from './drivers/base-async-storage-driver.js';
 export type { BaseStorageDriverOptions } from './drivers/base-storage-driver.js';
 export type { WebStorageLike } from './drivers/web-storage-driver.js';
 export type {

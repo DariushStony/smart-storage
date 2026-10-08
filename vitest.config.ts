@@ -46,6 +46,7 @@ export default defineConfig({
         'src/vault/vault.ts',
         'src/persistence/snapshot-store.ts',
         'src/drivers/async-storage-driver.ts',
+        'src/vault/async-vault.ts',
       ],
     },
   },
