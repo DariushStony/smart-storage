@@ -378,16 +378,19 @@ src/
 │   └── byte-size.ts            # UTF-8 length
 ├── codec/codec.ts              # Codec interface, composeCodecs
 ├── drivers/                    # Port + adapters
-│   ├── storage-driver.ts       # StorageDriver port
+│   ├── storage-driver.ts       # StorageDriver port and its contract
+│   ├── base-storage-driver.ts  # BaseStorageDriver (Template Method, namespace)
+│   ├── driver-registry.ts      # registerDriver; built-ins registered the same way
 │   ├── web-storage-driver.ts   # localStorage / sessionStorage adapter
 │   ├── memory-driver.ts        # Map adapter (SSR, tests)
-│   └── resolve-driver.ts       # 'local' | 'session' | 'memory' → driver
 ├── persistence/
+│   ├── snapshot-store.ts       # SnapshotStore / SnapshotFormat interfaces
 │   ├── snapshot-serializer.ts  # Snapshot ↔ string (envelope + codecs)
 │   ├── snapshot-repository.ts  # Load/save via a driver, quota handling
 │   ├── write-strategy.ts       # Immediate / debounced writes
 │   └── page-lifecycle.ts       # pagehide / visibilitychange
 ├── reporting/reporter.ts       # Safe onError wrapper
+├── testing/                    # Conformance kit (published as /testing)
 └── vault/
     ├── vault.ts                # Public Vault interface and option types
     ├── options.ts              # Defaults and option validation

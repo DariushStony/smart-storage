@@ -42,27 +42,45 @@ write strategy is in use.
 
 ## Units
 
-| Unit                              | Does                                                                      | Depends on               |
-| --------------------------------- | ------------------------------------------------------------------------- | ------------------------ |
-| `errors.ts`                       | `StorageError` and its subclasses, each with a stable `code`              | —                        |
-| `core/entry.ts`                   | `Entry` (value as JSON text + `expiresAt`), expiry math, `toJson`         | errors                   |
-| `core/snapshot.ts`                | Immutable map of entries; `with`, `without`, `live`, `compact`            | entry                    |
-| `core/envelope.ts`                | Encode format v2; decode v2 and 1.x                                       | snapshot                 |
-| `core/validation.ts`              | Key, TTL and option checks                                                | errors                   |
-| `core/byte-size.ts`               | UTF-8 length without allocating                                           | —                        |
-| `codec/codec.ts`                  | `Codec` interface and `composeCodecs`                                     | —                        |
-| `drivers/storage-driver.ts`       | The `StorageDriver` port: `read`, `write`, `remove`                       | —                        |
-| `drivers/web-storage-driver.ts`   | Adapter for `localStorage` / `sessionStorage`                             | port                     |
-| `drivers/memory-driver.ts`        | `Map` adapter for SSR and tests                                           | port                     |
-| `drivers/resolve-driver.ts`       | `'local' \| 'session' \| 'memory'` → driver, with memory fallback         | adapters, errors         |
-| `persistence/snapshot-serializer` | Snapshot ↔ stored string (envelope + codecs), pure                        | core, codec              |
-| `persistence/snapshot-repository` | Load/save via a driver; raw-string cache; `maxBytes`; quota → typed error | serializer, port, errors |
-| `persistence/write-strategy`      | `ImmediateWriteStrategy`, `DebouncedWriteStrategy`                        | repository, lifecycle    |
-| `persistence/page-lifecycle`      | `pagehide` / `visibilitychange` subscription; no-op on the server         | —                        |
-| `reporting/reporter.ts`           | Calls `onError`, swallowing anything it throws                            | errors                   |
-| `vault/default-vault.ts`          | The `Vault` facade: one read path, one write path                         | everything above         |
-| `vault/registry.ts`               | One live vault per (driver, key); newer takes over                        | port                     |
-| `vault/create-vault.ts`           | Composition root                                                          | everything               |
+| Unit                              | Does                                                                       | Depends on                     |
+| --------------------------------- | -------------------------------------------------------------------------- | ------------------------------ |
+| `errors.ts`                       | `StorageError` and its subclasses, each with a stable `code`               | —                              |
+| `core/entry.ts`                   | `Entry` (value as JSON text + `expiresAt`), expiry math, `toJson`          | errors                         |
+| `core/snapshot.ts`                | Immutable map of entries; `with`, `without`, `live`, `compact`             | entry                          |
+| `core/envelope.ts`                | Encode format v2; decode v2 and 1.x                                        | snapshot                       |
+| `core/validation.ts`              | Key, TTL and option checks                                                 | errors                         |
+| `core/byte-size.ts`               | UTF-8 length without allocating                                            | —                              |
+| `codec/codec.ts`                  | `Codec` interface and `composeCodecs`                                      | —                              |
+| `drivers/storage-driver.ts`       | The `StorageDriver` port and its contract; `isStorageDriver` guard         | —                              |
+| `drivers/base-storage-driver.ts`  | `BaseStorageDriver`: Template Method with optional key namespace           | port, validation               |
+| `drivers/web-storage-driver.ts`   | Adapter for `localStorage` / `sessionStorage`                              | port                           |
+| `drivers/memory-driver.ts`        | `Map` adapter for SSR and tests                                            | port                           |
+| `drivers/driver-registry.ts`      | Name → driver factory; built-ins and custom drivers alike; memory fallback | adapters, errors               |
+| `persistence/snapshot-serializer` | Snapshot ↔ stored string (envelope + codecs), pure                         | core, codec                    |
+| `persistence/snapshot-store.ts`   | `SnapshotStore` and `SnapshotFormat` interfaces the vault depends on       | core                           |
+| `persistence/snapshot-repository` | Load/save via a driver; raw-string cache; `maxBytes`; quota → typed error  | `SnapshotFormat`, port, errors |
+| `persistence/write-strategy`      | `ImmediateWriteStrategy`, `DebouncedWriteStrategy`                         | repository, lifecycle          |
+| `persistence/page-lifecycle`      | `pagehide` / `visibilitychange` subscription; no-op on the server          | —                              |
+| `reporting/reporter.ts`           | Calls `onError`, swallowing anything it throws                             | errors                         |
+| `vault/default-vault.ts`          | The `Vault` facade: one read path, one write path                          | everything above               |
+| `vault/registry.ts`               | One live vault per (driver, key); newer takes over                         | port                           |
+| `vault/create-vault.ts`           | Composition root                                                           | everything                     |
+
+## Extending with new storage
+
+The design is open for new backends (OCP). A backend implements the three
+method `StorageDriver` port, optionally through `BaseStorageDriver`, and is
+registered with `registerDriver(name, factory)`. The built-in `local`,
+`session` and `memory` drivers go through the same registry, so the package
+has no list of backends to edit. Every driver is held to one written contract
+(Liskov substitution), which `src/testing` verifies. That kit is published at
+`@dariushstony/smart-storage/testing`, imports only driver _types_, and runs
+against every built-in driver in unit tests and in real Chromium. The
+implementer's guide is [CUSTOM_STORAGE.md](./CUSTOM_STORAGE.md).
+
+Inside the package, `DefaultVault` and the write strategies depend on the
+`SnapshotStore` interface and the repository depends on `SnapshotFormat`, so
+only `create-vault.ts` names concrete classes (dependency inversion).
 
 ## Data flow
 
