@@ -73,12 +73,18 @@ describe('resolveOptions', () => {
     }
   );
 
+  it('accepts any driver name; unknown names fail when the vault is built', () => {
+    expect(
+      resolveOptions({ key: 'K', driver: 'not-registered-yet' }).driver
+    ).toBe('not-registered-yet');
+  });
+
   it.each([
     ['no options', undefined],
     ['null', null],
     ['a missing key', {}],
     ['an empty key', { key: '' }],
-    ['an unknown driver name', { key: 'K', driver: 'indexeddb' }],
+    ['an empty driver name', { key: 'K', driver: '' }],
     ['a driver without methods', { key: 'K', driver: {} }],
     ['codecs that are not an array', { key: 'K', codecs: {} }],
     ['a codec without methods', { key: 'K', codecs: [{}] }],

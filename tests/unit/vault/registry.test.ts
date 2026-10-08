@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
-import { resetSharedDrivers } from '../../../src/drivers/resolve-driver.js';
 import {
+  registerDriver,
+  resetDriverRegistry,
+} from '../../../src/drivers/driver-registry.js';
+import {
+  StorageArgumentError,
   StorageConflictError,
   StorageDisposedError,
 } from '../../../src/errors.js';
@@ -20,14 +24,14 @@ const conflictSpy = (): Mock<(error: StorageError) => void> =>
   vi.fn<(error: StorageError) => void>();
 
 beforeEach(() => {
-  resetSharedDrivers();
+  resetDriverRegistry();
   localStorage.clear();
   sessionStorage.clear();
 });
 
 afterEach(() => {
   created.splice(0).forEach((vault) => vault.dispose());
-  resetSharedDrivers();
+  resetDriverRegistry();
   vi.useRealTimers();
 });
 
@@ -96,6 +100,21 @@ describe('one live vault per storage key', () => {
     track(createVault({ key: 'K', onError }));
 
     expect(onError).toHaveBeenCalledWith(expect.any(StorageConflictError));
+  });
+
+  it('detects two vaults on one key through a registered driver name', () => {
+    registerDriver('custom', () => new MemoryDriver());
+    const onError = conflictSpy();
+    track(createVault({ key: 'K', driver: 'custom' }));
+    track(createVault({ key: 'K', driver: 'custom', onError }));
+
+    expect(onError).toHaveBeenCalledWith(expect.any(StorageConflictError));
+  });
+
+  it('rejects a driver name nobody registered', () => {
+    expect(() => createVault({ key: 'K', driver: 'nope' })).toThrow(
+      StorageArgumentError
+    );
   });
 
   it('a disposed vault frees its key', () => {

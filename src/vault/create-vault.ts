@@ -1,5 +1,5 @@
 import { composeCodecs } from '../codec/codec.js';
-import { resolveDriver } from '../drivers/resolve-driver.js';
+import { resolveDriver } from '../drivers/driver-registry.js';
 import { StorageConflictError } from '../errors.js';
 import { browserLifecycle } from '../persistence/page-lifecycle.js';
 import { SnapshotRepository } from '../persistence/snapshot-repository.js';

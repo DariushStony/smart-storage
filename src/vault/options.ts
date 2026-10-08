@@ -5,8 +5,8 @@ import {
   assertNonNegative,
   assertPositive,
 } from '../core/validation.js';
-import type { DriverSpec } from '../drivers/resolve-driver.js';
-import type { StorageDriver } from '../drivers/storage-driver.js';
+import type { DriverSpec } from '../drivers/driver-registry.js';
+import { isStorageDriver } from '../drivers/storage-driver.js';
 import { StorageArgumentError } from '../errors.js';
 import type { StorageError } from '../errors.js';
 import type { VaultOptions } from './vault.js';
@@ -75,19 +75,11 @@ function resolveOptions(options: VaultOptions): ResolvedOptions {
 }
 
 function assertDriver(driver: unknown): void {
-  if (driver === 'local' || driver === 'session' || driver === 'memory') return;
-
-  const candidate = driver as Partial<StorageDriver> | null;
   const valid =
-    typeof candidate === 'object' &&
-    candidate !== null &&
-    typeof candidate.name === 'string' &&
-    typeof candidate.read === 'function' &&
-    typeof candidate.write === 'function' &&
-    typeof candidate.remove === 'function';
+    typeof driver === 'string' ? driver.trim() !== '' : isStorageDriver(driver);
   if (!valid) {
     throw new StorageArgumentError(
-      'driver must be "local", "session", "memory" or a StorageDriver object.'
+      'driver must be a registered driver name (such as "local") or a StorageDriver object.'
     );
   }
 }
