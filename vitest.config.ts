@@ -24,7 +24,7 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
       // Type-only modules have no runtime code to measure.
-      exclude: ['src/vault/vault.ts'],
+      exclude: ['src/vault/vault.ts', 'src/persistence/snapshot-store.ts'],
     },
   },
 });

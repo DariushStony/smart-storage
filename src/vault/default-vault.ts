@@ -7,7 +7,7 @@ import {
   StorageDisposedError,
   toStorageError,
 } from '../errors.js';
-import type { SnapshotRepository } from '../persistence/snapshot-repository.js';
+import type { SnapshotStore } from '../persistence/snapshot-store.js';
 import type { WriteStrategy } from '../persistence/write-strategy.js';
 import type { Reporter } from '../reporting/reporter.js';
 import type { Retirable } from './registry.js';
@@ -15,7 +15,7 @@ import type { SetOptions, Vault, VaultStats } from './vault.js';
 
 interface VaultDeps {
   key: string;
-  repository: SnapshotRepository;
+  repository: SnapshotStore;
   strategy: WriteStrategy;
   maxItems: number;
   maxBytes: number;
@@ -30,7 +30,7 @@ interface VaultDeps {
  */
 class DefaultVault implements Vault, Retirable {
   readonly key: string;
-  private readonly repository: SnapshotRepository;
+  private readonly repository: SnapshotStore;
   private readonly strategy: WriteStrategy;
   private readonly maxItems: number;
   private readonly maxBytes: number;

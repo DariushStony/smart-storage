@@ -15,6 +15,7 @@ import {
 } from '../../../src/errors.js';
 import type { StorageError } from '../../../src/errors.js';
 import { SnapshotRepository } from '../../../src/persistence/snapshot-repository.js';
+import type { SnapshotFormat } from '../../../src/persistence/snapshot-store.js';
 import { SnapshotSerializer } from '../../../src/persistence/snapshot-serializer.js';
 
 const entry = (value: unknown, expiresAt: number | null = null): Entry => ({
@@ -291,5 +292,31 @@ describe('SnapshotRepository.measure', () => {
     const { repository } = setup();
     expect(repository.driverName).toBe('memory');
     expect(repository.key).toBe('K');
+  });
+});
+
+describe('SnapshotRepository seams', () => {
+  it('works with any SnapshotFormat', () => {
+    const driver = new MemoryDriver();
+    const format: SnapshotFormat = {
+      serialize: () => 'TEXT',
+      deserialize: () => ({
+        snapshot: Snapshot.empty.with('a', entry(1)),
+        dropped: 0,
+      }),
+    };
+    const repository = new SnapshotRepository({
+      driver,
+      key: 'K',
+      serializer: format,
+      maxBytes: 1000,
+      report: vi.fn(),
+    });
+
+    repository.save(Snapshot.empty);
+    expect(driver.read('K')).toBe('TEXT');
+
+    driver.write('K', 'OTHER');
+    expect(repository.load().get('a', 0)).toEqual(entry(1));
   });
 });

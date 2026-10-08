@@ -2,7 +2,7 @@ import type { Snapshot } from '../core/snapshot.js';
 import { toStorageError } from '../errors.js';
 import type { Reporter } from '../reporting/reporter.js';
 import type { PageLifecycle } from './page-lifecycle.js';
-import type { SnapshotRepository } from './snapshot-repository.js';
+import type { SnapshotStore } from './snapshot-store.js';
 
 /** Decides when a changed snapshot reaches storage. */
 interface WriteStrategy {
@@ -17,7 +17,7 @@ interface WriteStrategy {
 }
 
 class ImmediateWriteStrategy implements WriteStrategy {
-  constructor(private readonly repository: SnapshotRepository) {}
+  constructor(private readonly repository: SnapshotStore) {}
 
   write(snapshot: Snapshot): void {
     this.repository.save(snapshot);
@@ -35,7 +35,7 @@ class ImmediateWriteStrategy implements WriteStrategy {
 }
 
 interface DebouncedDeps {
-  repository: SnapshotRepository;
+  repository: SnapshotStore;
   delayMs: number;
   report: Reporter;
   lifecycle: PageLifecycle;
@@ -47,7 +47,7 @@ interface DebouncedDeps {
  * for the next attempt.
  */
 class DebouncedWriteStrategy implements WriteStrategy {
-  private readonly repository: SnapshotRepository;
+  private readonly repository: SnapshotStore;
   private readonly delayMs: number;
   private readonly report: Reporter;
   private readonly detach: () => void;
