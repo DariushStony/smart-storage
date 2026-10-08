@@ -102,7 +102,8 @@ Not implemented, but the design leaves room for them:
 - **Cross-tab sync:** an optional `subscribe` capability on drivers (the web
   `storage` event). The repository's raw-string cache already picks up external
   writes on read.
-- **Typed keys:** `vault.key<T>(name, { validate })` as a thin wrapper over
+- **Typed keys:** `vault.item<T>(name, { validate })` (not `key`, which is
+  already the vault's storage key) as a thin wrapper over
   `get` / `set`.
 
 ## Where to start reading
