@@ -16,5 +16,7 @@ declare global {
     __smartStorageReady?: boolean;
     /** Lets a spec keep one vault alive across several evaluate() calls. */
     __vault?: SmartStorage.Vault;
+    /** Lets a spec keep one async vault alive across evaluate() calls. */
+    __asyncVault?: SmartStorage.AsyncVault;
   }
 }

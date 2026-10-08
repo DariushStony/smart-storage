@@ -37,7 +37,10 @@ test.describe('the shipped bundle', () => {
 
     expect(exports).toEqual(
       [
+        'AsyncMemoryDriver',
+        'BaseAsyncStorageDriver',
         'BaseStorageDriver',
+        'IndexedDBDriver',
         'MemoryDriver',
         'StorageAccessError',
         'StorageArgumentError',
@@ -49,7 +52,9 @@ test.describe('the shipped bundle', () => {
         'StorageSerializationError',
         'StorageUnavailableError',
         'WebStorageDriver',
+        'createAsyncVault',
         'createVault',
+        'registerAsyncDriver',
         'registerDriver',
         'unregisterDriver',
       ].sort()
@@ -394,6 +399,88 @@ test.describe('extension API in a real browser', () => {
       );
       createVault({ key: 'E2E_REGISTERED', driver: 'prefixed' }).set('a', 1);
       return localStorage.getItem('app:E2E_REGISTERED');
+    });
+
+    expect(JSON.parse(raw ?? 'null')).toEqual({
+      v: 2,
+      items: [{ key: 'a', value: 1 }],
+    });
+  });
+});
+
+test.describe('async vault in a real browser', () => {
+  test('IndexedDB data survives a reload', async ({ page }) => {
+    await page.evaluate(async () => {
+      await window.smartStorage
+        .createAsyncVault({ key: 'E2E_IDB' })
+        .set('theme', 'dark');
+    });
+
+    await reload(page);
+
+    const result = await page.evaluate(async () => {
+      const vault = window.smartStorage.createAsyncVault({ key: 'E2E_IDB' });
+      return {
+        theme: await vault.get('theme'),
+        driver: (await vault.stats()).driver,
+      };
+    });
+    expect(result).toEqual({ theme: 'dark', driver: 'indexedDB' });
+  });
+
+  test('the real IndexedDBDriver honours the async driver contract', async ({
+    page,
+  }) => {
+    const failures = await page.evaluate(async () => {
+      const { IndexedDBDriver } = window.smartStorage;
+      const { verifyAsyncStorageDriver } = window.smartStorageTesting;
+      const report = await verifyAsyncStorageDriver(
+        () => new IndexedDBDriver({ databaseName: 'e2e-kit' })
+      );
+      return report.checks
+        .filter((check) => !check.passed)
+        .map((check) => `${check.rule}: ${String(check.error)}`);
+    });
+
+    expect(failures).toEqual([]);
+  });
+
+  test('an open async vault sees what another tab wrote', async ({
+    context,
+  }) => {
+    const first = await context.newPage();
+    const second = await context.newPage();
+    await open(first);
+    await open(second);
+
+    await second.evaluate(async () => {
+      const vault = window.smartStorage.createAsyncVault({
+        key: 'E2E_IDB_TABS',
+      });
+      await vault.get('shared');
+      window.__asyncVault = vault;
+    });
+    await first.evaluate(async () => {
+      await window.smartStorage
+        .createAsyncVault({ key: 'E2E_IDB_TABS' })
+        .set('shared', 'from-tab-1');
+    });
+
+    const seen = await second.evaluate(() =>
+      window.__asyncVault?.get('shared')
+    );
+    expect(seen).toBe('from-tab-1');
+
+    await first.close();
+    await second.close();
+  });
+
+  test('an async vault works on localStorage too', async ({ page }) => {
+    const raw = await page.evaluate(async () => {
+      await window.smartStorage
+        .createAsyncVault({ key: 'E2E_ASYNC_LOCAL', driver: 'local' })
+        .set('a', 1);
+      return localStorage.getItem('E2E_ASYNC_LOCAL');
     });
 
     expect(JSON.parse(raw ?? 'null')).toEqual({
