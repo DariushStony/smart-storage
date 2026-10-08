@@ -37,6 +37,7 @@ test.describe('the shipped bundle', () => {
 
     expect(exports).toEqual(
       [
+        'BaseStorageDriver',
         'MemoryDriver',
         'StorageAccessError',
         'StorageArgumentError',
@@ -49,6 +50,8 @@ test.describe('the shipped bundle', () => {
         'StorageUnavailableError',
         'WebStorageDriver',
         'createVault',
+        'registerDriver',
+        'unregisterDriver',
       ].sort()
     );
   });
@@ -345,5 +348,57 @@ test.describe('corrupted storage in a real browser', () => {
     expect(result.untouched).toBe('not json at all }{');
     expect(result.errors).toEqual(['CORRUPTED']);
     expect(result.after).toBe('recovered');
+  });
+});
+
+test.describe('extension API in a real browser', () => {
+  test('real localStorage and sessionStorage honour the driver contract', async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const { WebStorageDriver } = window.smartStorage;
+      const { verifyStorageDriver } = window.smartStorageTesting;
+      const failures = (report: {
+        checks: Array<{ rule: string; passed: boolean; error?: unknown }>;
+      }): string[] =>
+        report.checks
+          .filter((check) => !check.passed)
+          .map((check) => `${check.rule}: ${String(check.error)}`);
+
+      const local = await verifyStorageDriver(
+        () => new WebStorageDriver(localStorage, 'localStorage')
+      );
+      const session = await verifyStorageDriver(
+        () => new WebStorageDriver(sessionStorage, 'sessionStorage')
+      );
+      return {
+        local: failures(local),
+        session: failures(session),
+        leftover: localStorage.length + sessionStorage.length,
+      };
+    });
+
+    expect(result).toEqual({ local: [], session: [], leftover: 0 });
+  });
+
+  test('a registered, namespaced driver works through the built bundle', async ({
+    page,
+  }) => {
+    const raw = await page.evaluate(() => {
+      const { WebStorageDriver, createVault, registerDriver } =
+        window.smartStorage;
+      registerDriver(
+        'prefixed',
+        () =>
+          new WebStorageDriver(localStorage, 'prefixed', { namespace: 'app' })
+      );
+      createVault({ key: 'E2E_REGISTERED', driver: 'prefixed' }).set('a', 1);
+      return localStorage.getItem('app:E2E_REGISTERED');
+    });
+
+    expect(JSON.parse(raw ?? 'null')).toEqual({
+      v: 2,
+      items: [{ key: 'a', value: 1 }],
+    });
   });
 });

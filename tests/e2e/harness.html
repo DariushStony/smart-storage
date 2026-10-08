@@ -16,8 +16,10 @@
       // Imports the actual published entry point, so these specs verify the
       // shipped artifact rather than the TypeScript sources.
       import * as smartStorage from '/dist/index.js';
+      import * as smartStorageTesting from '/dist/testing.js';
 
       window.smartStorage = smartStorage;
+      window.smartStorageTesting = smartStorageTesting;
       window.__smartStorageReady = true;
     </script>
   </body>
