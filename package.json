@@ -37,6 +37,13 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing/index.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -62,7 +69,7 @@
     "analyze": "size-limit --why",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "typecheck:dist": "tsc -p tsconfig.consumer.json && tsc -p tsconfig.consumer-es2022.json",
+    "typecheck:dist": "tsc -p tsconfig.consumer.json && tsc -p tsconfig.consumer-es2022.json && attw --pack . --ignore-rules false-esm",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -74,6 +81,7 @@
     "build": "tsup && tsc --emitDeclarationOnly"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@playwright/test": "^1.62.1",
