@@ -64,6 +64,11 @@ function builtIns(): Map<string, Registration> {
 
 let registrations = builtIns();
 
+// The identity two vaults are compared by for each shared name. It outlives
+// re-registration, so after hot module reloading builds a new driver
+// instance, a new vault still sees the one created before it.
+let scopes = new Map<string, object>();
+
 /**
  * Makes a driver available by name: `createVault({ key, driver: name })`.
  * Registering a name again replaces it, so hot module reloading works.
@@ -108,6 +113,22 @@ function resolveDriver(spec: DriverSpec, report: Reporter): StorageDriver {
   return resolution.driver;
 }
 
+/**
+ * What "the same storage" means for conflict detection: the shared name's
+ * scope for registered shared drivers, otherwise the driver instance.
+ */
+function conflictScope(spec: DriverSpec, driver: StorageDriver): object {
+  if (typeof spec !== 'string' || !registrations.get(spec)?.shared) {
+    return driver;
+  }
+  let scope = scopes.get(spec);
+  if (!scope) {
+    scope = {};
+    scopes.set(spec, scope);
+  }
+  return scope;
+}
+
 function build(name: string, factory: DriverFactory): Resolution {
   let driver: unknown;
   try {
@@ -140,7 +161,14 @@ function assertNotBuiltIn(name: string): void {
 /** Test hook: back to only the built-ins. Not exported from the package. */
 function resetDriverRegistry(): void {
   registrations = builtIns();
+  scopes = new Map();
 }
 
-export { registerDriver, unregisterDriver, resolveDriver, resetDriverRegistry };
+export {
+  registerDriver,
+  unregisterDriver,
+  resolveDriver,
+  conflictScope,
+  resetDriverRegistry,
+};
 export type { DriverSpec, DriverFactory, RegisterDriverOptions };
