@@ -1,6 +1,24 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
+const fromSrc = (path: string): string =>
+  fileURLToPath(new URL(`./src/${path}`, import.meta.url));
+
 export default defineConfig({
+  // Lets examples import the package by name while tests run the source.
+  resolve: {
+    alias: [
+      {
+        find: /^@dariushstony\/smart-storage\/testing$/,
+        replacement: fromSrc('testing/index.ts'),
+      },
+      {
+        find: /^@dariushstony\/smart-storage$/,
+        replacement: fromSrc('index.ts'),
+      },
+    ],
+  },
   test: {
     // happy-dom gives us window, localStorage, sessionStorage and DOMException
     // without a real browser. Genuine persistence across reloads, real quota
@@ -24,7 +42,7 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
       // Type-only modules have no runtime code to measure.
-      exclude: ['src/drivers/storage-driver.ts', 'src/vault/vault.ts'],
+      exclude: ['src/vault/vault.ts', 'src/persistence/snapshot-store.ts'],
     },
   },
 });

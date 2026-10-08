@@ -10,6 +10,7 @@ import { StorageQuotaError } from '../../../src/errors.js';
 import type { StorageError } from '../../../src/errors.js';
 import type { PageLifecycle } from '../../../src/persistence/page-lifecycle.js';
 import { SnapshotRepository } from '../../../src/persistence/snapshot-repository.js';
+import type { SnapshotStore } from '../../../src/persistence/snapshot-store.js';
 import { SnapshotSerializer } from '../../../src/persistence/snapshot-serializer.js';
 import {
   DebouncedWriteStrategy,
@@ -227,5 +228,26 @@ describe('DebouncedWriteStrategy', () => {
     vi.advanceTimersByTime(100);
 
     expect(driver.read('K')).toBe(encodeEnvelope(one));
+  });
+});
+
+describe('seams', () => {
+  it('ImmediateWriteStrategy works with any SnapshotStore', () => {
+    const saved: Snapshot[] = [];
+    const store: SnapshotStore = {
+      key: 'K',
+      driverName: 'fake',
+      load: () => Snapshot.empty,
+      save: (snapshot) => {
+        saved.push(snapshot);
+      },
+      remove: () => undefined,
+      measure: () => 0,
+      storedBytes: () => 0,
+    };
+
+    new ImmediateWriteStrategy(store).write(one);
+
+    expect(saved).toEqual([one]);
   });
 });

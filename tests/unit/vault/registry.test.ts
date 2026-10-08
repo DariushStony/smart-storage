@@ -2,8 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
-import { resetSharedDrivers } from '../../../src/drivers/resolve-driver.js';
+import { WebStorageDriver } from '../../../src/drivers/web-storage-driver.js';
 import {
+  registerDriver,
+  resetDriverRegistry,
+} from '../../../src/drivers/driver-registry.js';
+import {
+  StorageArgumentError,
   StorageConflictError,
   StorageDisposedError,
 } from '../../../src/errors.js';
@@ -20,14 +25,14 @@ const conflictSpy = (): Mock<(error: StorageError) => void> =>
   vi.fn<(error: StorageError) => void>();
 
 beforeEach(() => {
-  resetSharedDrivers();
+  resetDriverRegistry();
   localStorage.clear();
   sessionStorage.clear();
 });
 
 afterEach(() => {
   created.splice(0).forEach((vault) => vault.dispose());
-  resetSharedDrivers();
+  resetDriverRegistry();
   vi.useRealTimers();
 });
 
@@ -96,6 +101,55 @@ describe('one live vault per storage key', () => {
     track(createVault({ key: 'K', onError }));
 
     expect(onError).toHaveBeenCalledWith(expect.any(StorageConflictError));
+  });
+
+  it('detects two vaults on one key through a registered driver name', () => {
+    registerDriver('custom', () => new MemoryDriver());
+    const onError = conflictSpy();
+    track(createVault({ key: 'K', driver: 'custom' }));
+    track(createVault({ key: 'K', driver: 'custom', onError }));
+
+    expect(onError).toHaveBeenCalledWith(expect.any(StorageConflictError));
+  });
+
+  it('rejects a driver name nobody registered', () => {
+    expect(() => createVault({ key: 'K', driver: 'nope' })).toThrow(
+      StorageArgumentError
+    );
+  });
+
+  // Hot module reloading re-runs registerDriver, which builds a new driver
+  // instance over the same backend; the old vault must still be retired.
+  it('re-registering a driver name keeps one vault per key and loses no write', () => {
+    vi.useFakeTimers();
+    const backend = new MemoryDriver();
+    const factory = (): WebStorageDriver =>
+      new WebStorageDriver({
+        getItem: (key) => backend.read(key),
+        setItem: (key, value) => {
+          backend.write(key, value);
+        },
+        removeItem: (key) => {
+          backend.remove(key);
+        },
+      });
+    registerDriver('kv', factory);
+    const first = track(
+      createVault({ key: 'PREFS', driver: 'kv', debounceMs: 50 })
+    );
+    first.set('draft', 'old');
+
+    registerDriver('kv', factory);
+    const onError = conflictSpy();
+    const second = track(
+      createVault({ key: 'PREFS', driver: 'kv', debounceMs: 50, onError })
+    );
+    second.set('theme', 'dark');
+    vi.advanceTimersByTime(120);
+
+    expect(onError).toHaveBeenCalledWith(expect.any(StorageConflictError));
+    expect(() => first.get('draft')).toThrow(StorageDisposedError);
+    expect(second.keys().sort()).toEqual(['draft', 'theme']);
   });
 
   it('a disposed vault frees its key', () => {

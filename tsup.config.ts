@@ -4,6 +4,9 @@ export default defineConfig({
   // Entry points for your library
   entry: {
     index: 'src/index.ts',
+    // Published as @dariushstony/smart-storage/testing, so test code never
+    // lands in application bundles.
+    testing: 'src/testing/index.ts',
   },
 
   // Output formats - ESM and CommonJS

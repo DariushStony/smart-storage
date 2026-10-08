@@ -3,7 +3,7 @@ import type { Mock } from 'vitest';
 
 import { utf8ByteLength } from '../../../src/core/byte-size.js';
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
-import { resetSharedDrivers } from '../../../src/drivers/resolve-driver.js';
+import { resetDriverRegistry } from '../../../src/drivers/driver-registry.js';
 import {
   StorageAccessError,
   StorageArgumentError,
@@ -548,12 +548,12 @@ describe('dispose', () => {
 
 describe('default driver', () => {
   beforeEach(() => {
-    resetSharedDrivers();
+    resetDriverRegistry();
     localStorage.clear();
   });
 
   afterEach(() => {
-    resetSharedDrivers();
+    resetDriverRegistry();
   });
 
   it('uses window.localStorage when no driver is given', () => {

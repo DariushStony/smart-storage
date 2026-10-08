@@ -7,12 +7,12 @@ import {
   StorageQuotaError,
 } from '../errors.js';
 import type { Reporter } from '../reporting/reporter.js';
-import type { SnapshotSerializer } from './snapshot-serializer.js';
+import type { SnapshotFormat, SnapshotStore } from './snapshot-store.js';
 
 interface RepositoryDeps {
   driver: StorageDriver;
   key: string;
-  serializer: SnapshotSerializer;
+  serializer: SnapshotFormat;
   maxBytes: number;
   report: Reporter;
 }
@@ -22,10 +22,10 @@ interface RepositoryDeps {
  * string it saw: an unchanged string skips decoding, while a changed one
  * (another tab wrote) is decoded again. Never writes on load.
  */
-class SnapshotRepository {
+class SnapshotRepository implements SnapshotStore {
   readonly key: string;
   private readonly driver: StorageDriver;
-  private readonly serializer: SnapshotSerializer;
+  private readonly serializer: SnapshotFormat;
   private readonly maxBytes: number;
   private readonly report: Reporter;
   private cachedRaw: string | null = null;

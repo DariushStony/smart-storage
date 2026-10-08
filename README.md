@@ -110,7 +110,7 @@ After `dispose()` every other method throws `StorageDisposedError`.
 | Option       | Default     | Description                                                                                                                                           |
 | ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key`        | (required)  | Storage key the vault owns.                                                                                                                           |
-| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'` or a `StorageDriver`.                                                                                              |
+| `driver`     | `'local'`   | `'local'`, `'session'`, `'memory'`, a name added with `registerDriver`, or a `StorageDriver` instance.                                                |
 | `codecs`     | `[]`        | `{ encode, decode }` string transforms, applied after JSON and reversed on read.                                                                      |
 | `debounceMs` | `0`         | Coalesce writes made within this window. `0` writes every change immediately.                                                                         |
 | `maxBytes`   | `4_000_000` | Hard limit on the stored string (UTF-8 bytes). A write that would grow it past the limit throws; writes that shrink data already over it are allowed. |
@@ -212,24 +212,51 @@ next write.
 
 ## Custom drivers
 
-A driver does raw string I/O under a key:
+You can add a new storage backend without changing the package. A driver only
+moves strings under a key; the vault does the rest. Extend
+`BaseStorageDriver`, register it, and use it by name:
 
 ```ts
-import type { StorageDriver } from '@dariushstony/smart-storage';
+import {
+  BaseStorageDriver,
+  createVault,
+  registerDriver,
+} from '@dariushstony/smart-storage';
 
-const driver: StorageDriver = {
-  name: 'my-backend',
-  read: (key) => backend.get(key) ?? null,
-  write: (key, value) => backend.set(key, value),
-  remove: (key) => backend.delete(key),
-};
+class MyDriver extends BaseStorageDriver {
+  readonly name = 'my-backend';
+  protected readRaw(key: string) {
+    return backend.get(key) ?? null;
+  }
+  protected writeRaw(key: string, value: string) {
+    backend.set(key, value);
+  }
+  protected removeRaw(key: string) {
+    backend.delete(key);
+  }
+}
 
-createVault({ key: 'DATA', driver });
+registerDriver('my-backend', () => new MyDriver({ namespace: 'myapp' }));
+const vault = createVault({ key: 'DATA', driver: 'my-backend' });
 ```
 
-`WebStorageDriver` wraps anything with `getItem`, `setItem` and `removeItem`,
-and `MemoryDriver` is a `Map`-backed driver you can share between vaults in
-tests.
+Prove your driver honours the contract with the conformance kit, which works
+with any test runner:
+
+```ts
+import { assertStorageDriver } from '@dariushstony/smart-storage/testing';
+
+await assertStorageDriver(() => new MyDriver());
+```
+
+The built-in drivers are exported too: `WebStorageDriver` wraps anything with
+`getItem` / `setItem` / `removeItem`, and `MemoryDriver` keeps data in a
+`Map`. Both accept `{ namespace }`, so several apps can share one backend.
+
+[docs/CUSTOM_STORAGE.md](./docs/CUSTOM_STORAGE.md) covers the full contract,
+errors, registration and a checklist.
+[examples/cookie-driver](./examples/cookie-driver/) is a complete, tested
+driver.
 
 ---
 

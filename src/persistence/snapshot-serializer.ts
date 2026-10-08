@@ -3,9 +3,10 @@ import { decodeEnvelope, encodeEnvelope } from '../core/envelope.js';
 import type { DecodedEnvelope } from '../core/envelope.js';
 import type { Snapshot } from '../core/snapshot.js';
 import { StorageSerializationError } from '../errors.js';
+import type { SnapshotFormat } from './snapshot-store.js';
 
 /** Snapshot ↔ stored text. Pure, so a future async vault can reuse it as-is. */
-class SnapshotSerializer {
+class SnapshotSerializer implements SnapshotFormat {
   constructor(private readonly codec: Codec) {}
 
   serialize(snapshot: Snapshot): string {

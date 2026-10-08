@@ -1,5 +1,5 @@
 import type { Codec } from '../codec/codec.js';
-import type { DriverSpec } from '../drivers/resolve-driver.js';
+import type { DriverSpec } from '../drivers/driver-registry.js';
 import type { StorageError } from '../errors.js';
 
 interface SetOptions {

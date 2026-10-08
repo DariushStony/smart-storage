@@ -7,6 +7,7 @@ describe('package exports', () => {
     // Guards the README's API section against drift.
     expect(Object.keys(api).sort()).toEqual(
       [
+        'BaseStorageDriver',
         'MemoryDriver',
         'StorageAccessError',
         'StorageArgumentError',
@@ -19,6 +20,8 @@ describe('package exports', () => {
         'StorageUnavailableError',
         'WebStorageDriver',
         'createVault',
+        'registerDriver',
+        'unregisterDriver',
       ].sort()
     );
   });
@@ -46,5 +49,15 @@ describe('package exports', () => {
 
     expect(errors[0]).toBeInstanceOf(api.StorageError);
     vault.dispose();
+  });
+});
+
+describe('testing entry', () => {
+  it('exports exactly the kit', async () => {
+    const testing = await import('../../src/testing/index.js');
+    expect(Object.keys(testing).sort()).toEqual([
+      'assertStorageDriver',
+      'verifyStorageDriver',
+    ]);
   });
 });

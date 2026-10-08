@@ -1,5 +1,5 @@
 import { composeCodecs } from '../codec/codec.js';
-import { resolveDriver } from '../drivers/resolve-driver.js';
+import { conflictScope, resolveDriver } from '../drivers/driver-registry.js';
 import { StorageConflictError } from '../errors.js';
 import { browserLifecycle } from '../persistence/page-lifecycle.js';
 import { SnapshotRepository } from '../persistence/snapshot-repository.js';
@@ -30,6 +30,8 @@ function createVault(options: VaultOptions): Vault {
   const report = createReporter(config.onError);
   const driver = resolveDriver(config.driver, report);
 
+  const scope = conflictScope(config.driver, driver);
+
   const repository = new SnapshotRepository({
     driver,
     key: config.key,
@@ -55,10 +57,10 @@ function createVault(options: VaultOptions): Vault {
     maxItems: config.maxItems,
     maxBytes: config.maxBytes,
     report,
-    onDispose: () => registry.release(driver, config.key, vault),
+    onDispose: () => registry.release(scope, config.key, vault),
   });
 
-  if (registry.claim(driver, config.key, vault)) {
+  if (registry.claim(scope, config.key, vault, driver.name)) {
     report(
       new StorageConflictError(
         `A vault for "${config.key}" on ${driver.name} already existed; it was disposed and this one replaces it.`
