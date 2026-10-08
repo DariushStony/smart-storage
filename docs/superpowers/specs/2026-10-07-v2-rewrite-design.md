@@ -323,7 +323,9 @@ Rule: an error is either thrown to the caller or passed to `onError`, never both
 
 Runtime: `createVault`, the nine error classes, `MemoryDriver`, `WebStorageDriver`.
 Types: `Vault`, `VaultOptions`, `VaultStats`, `SetOptions`, `Codec`,
-`StorageDriver`, `DriverSpec`, `StorageErrorCode`.
+`StorageDriver`, `DriverSpec`, `StorageErrorCode`, plus the constructor
+parameter types `WebStorageLike`, `StorageErrorOptions` and
+`StorageQuotaErrorOptions`.
 
 Removed: `getStorageSlice`, `disposeStorageSlice`, `StorageVault`,
 `StorageType`, `TransformChain`, `TransformHandler`, `InlineTransformHandler`,
@@ -367,7 +369,8 @@ persists v2. Expiry semantics are identical (`expiry` → `expiresAt`, epoch ms)
 - **Events:** emit from `DefaultVault.commit`; diff old vs new snapshot.
 - **Cross-tab:** optional `subscribe` capability on drivers (web `storage` event);
   the repository's raw-string cache already handles external writes on read.
-- **Typed keys:** `vault.key<T>(name, { validate })` as a thin wrapper over
+- **Typed keys:** `vault.item<T>(name, { validate })` (not `key`, which is
+  already the vault's storage key) as a thin wrapper over
   `get`/`set`.
 
 ## 8. Testing

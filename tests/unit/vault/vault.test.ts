@@ -5,6 +5,7 @@ import { utf8ByteLength } from '../../../src/core/byte-size.js';
 import { MemoryDriver } from '../../../src/drivers/memory-driver.js';
 import { resetSharedDrivers } from '../../../src/drivers/resolve-driver.js';
 import {
+  StorageAccessError,
   StorageArgumentError,
   StorageCorruptionError,
   StorageDisposedError,
@@ -14,7 +15,11 @@ import {
 } from '../../../src/errors.js';
 import type { StorageError } from '../../../src/errors.js';
 import { createVault } from '../../../src/vault/create-vault.js';
-import type { Vault, VaultOptions } from '../../../src/vault/vault.js';
+import type {
+  SetOptions,
+  Vault,
+  VaultOptions,
+} from '../../../src/vault/vault.js';
 
 interface Harness {
   vault: Vault;
@@ -161,7 +166,7 @@ describe('expiry', () => {
     const { vault } = makeVault();
     vault.set('token', 'x', { ttl: 500 });
 
-    vi.advanceTimersByTime(499);
+    vi.advanceTimersByTime(500);
     expect(vault.get('token')).toBe('x');
 
     vi.advanceTimersByTime(1);
@@ -195,7 +200,7 @@ describe('expiry', () => {
   it('update() returns false for missing or expired items', () => {
     const { vault } = makeVault();
     vault.set('gone', 1, { ttl: 10 });
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
 
     expect(vault.update('missing', 1)).toBe(false);
     expect(vault.update('gone', 1)).toBe(false);
@@ -230,7 +235,7 @@ describe('expiry', () => {
   it('reads never write, even when they find expired items', () => {
     const { vault, driver } = makeVault();
     vault.set('k', 1, { ttl: 10 });
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
     const write = vi.spyOn(driver, 'write');
     const remove = vi.spyOn(driver, 'remove');
 
@@ -248,7 +253,7 @@ describe('expiry', () => {
   it('the next write drops expired items from storage', () => {
     const { vault, raw } = makeVault();
     vault.set('old', 1, { ttl: 10 });
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
 
     vault.set('new', 2);
 
@@ -260,7 +265,7 @@ describe('expiry', () => {
     vault.set('a', 1, { ttl: 10 });
     vault.set('b', 2, { ttl: 10 });
     vault.set('c', 3);
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
 
     expect(vault.purgeExpired()).toBe(2);
     expect(raw()).toBe('{"v":2,"items":[{"key":"c","value":3}]}');
@@ -273,7 +278,7 @@ describe('remove / keys / toObject / clear', () => {
     const { vault } = makeVault();
     vault.set('a', 1);
     vault.set('gone', 1, { ttl: 10 });
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
 
     expect(vault.remove('a')).toBe(true);
     expect(vault.get('a')).toBeNull();
@@ -287,7 +292,7 @@ describe('remove / keys / toObject / clear', () => {
     vault.set('b', 2);
     vault.set('gone', 3, { ttl: 10 });
     vault.set('a', 4);
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
 
     expect(vault.keys()).toEqual(['b', 'a']);
   });
@@ -368,7 +373,7 @@ describe('limits', () => {
     const { vault, raw } = makeVault({ maxBytes: 1000 });
     vault.set('a', 'é');
     vault.set('gone', 1, { ttl: 10 });
-    vi.advanceTimersByTime(10);
+    vi.advanceTimersByTime(11);
     vault.set('b', 2);
 
     const bytes = utf8ByteLength(raw() ?? '');
@@ -576,5 +581,116 @@ describe('default driver', () => {
     expect(vault.get('a')).toBe(1);
     expect(vault.stats().driver).toBe('memory');
     expect(onError).toHaveBeenCalledWith(expect.any(StorageUnavailableError));
+  });
+});
+
+describe('edge cases', () => {
+  it('rejects a ttl whose expiry would pass the largest safe timestamp', () => {
+    const { vault } = makeVault();
+
+    expect(() => vault.set('k', 1, { ttl: Number.MAX_VALUE })).toThrow(
+      StorageArgumentError
+    );
+    expect(vault.has('k')).toBe(false);
+  });
+
+  // Regression: an overflowing extend() stored "expiresAt":Infinity, which
+  // made the whole key unreadable after a reload.
+  it('rejects an extension whose expiry would overflow and keeps the item as it was', () => {
+    const { vault } = makeVault();
+    vault.set('k', 1, { ttl: 1000 });
+
+    expect(() => vault.extend('k', Number.MAX_SAFE_INTEGER)).toThrow(
+      StorageArgumentError
+    );
+    expect(vault.ttl('k')).toBe(1000);
+  });
+
+  it('update() rejects undefined even when the key is missing', () => {
+    expect(() => makeVault().vault.update('missing', undefined)).toThrow(
+      StorageArgumentError
+    );
+  });
+
+  it('set() rejects options that are not an object', () => {
+    const { vault } = makeVault();
+
+    expect(() => vault.set('k', 1, null as unknown as SetOptions)).toThrow(
+      StorageArgumentError
+    );
+    expect(() => vault.set('k', 1, 5 as unknown as SetOptions)).toThrow(
+      StorageArgumentError
+    );
+  });
+
+  it('stats().bytes is the size of the stored string, even when it is unreadable', () => {
+    const driver = new MemoryDriver();
+    driver.write('RAW', 'x'.repeat(5000));
+    const { vault } = makeVault({ key: 'RAW' }, driver);
+
+    expect(vault.stats().bytes).toBe(5000);
+    expect(vault.stats().itemCount).toBe(0);
+  });
+
+  it('stats().bytes counts expired items that are still stored', () => {
+    const { vault, raw } = makeVault();
+    vault.set('old', 'x'.repeat(100), { ttl: 10 });
+    vi.advanceTimersByTime(11);
+
+    expect(vault.stats().bytes).toBe(utf8ByteLength(raw() ?? ''));
+    expect(vault.stats().itemCount).toBe(0);
+  });
+
+  it('stats().bytes reports the size a pending debounced write will have', () => {
+    const { vault, raw } = makeVault({ debounceMs: 100 });
+    vault.set('a', 'é');
+    const pendingBytes = vault.stats().bytes;
+
+    vault.flush();
+
+    expect(pendingBytes).toBe(utf8ByteLength(raw() ?? ''));
+  });
+
+  it('clear() keeps a pending write when removing the key fails', () => {
+    const { vault, driver } = makeVault({ debounceMs: 100 });
+    vault.set('a', 1);
+    vi.spyOn(driver, 'remove').mockImplementation(() => {
+      throw new Error('denied');
+    });
+
+    expect(() => vault.clear()).toThrow(StorageAccessError);
+    expect(vault.get('a')).toBe(1);
+  });
+
+  it('purgeExpired() counts only expired items, not maxItems evictions', () => {
+    const driver = new MemoryDriver();
+    driver.write(
+      'OVER',
+      JSON.stringify({
+        v: 2,
+        items: [
+          { key: 'a', value: 1 },
+          { key: 'b', value: 2 },
+          { key: 'c', value: 3 },
+          { key: 'gone', value: 4, expiresAt: 500 },
+        ],
+      })
+    );
+    const { vault } = makeVault({ key: 'OVER', maxItems: 2 }, driver);
+
+    expect(vault.purgeExpired()).toBe(1);
+    expect(vault.keys()).toEqual(['b', 'c']);
+  });
+
+  it('an item is still live at exactly expiresAt and gone 1 ms later, as in 1.x', () => {
+    const { vault } = makeVault();
+    vault.set('k', 1, { ttl: 500 });
+
+    vi.advanceTimersByTime(500);
+    expect(vault.get('k')).toBe(1);
+    expect(vault.ttl('k')).toBe(0);
+
+    vi.advanceTimersByTime(1);
+    expect(vault.get('k')).toBeNull();
   });
 });

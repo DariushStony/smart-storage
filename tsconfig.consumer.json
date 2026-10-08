@@ -1,11 +1,12 @@
 {
   // Type-checks tests/types/consumer.ts against the built package (dist/),
   // with skipLibCheck off, as a strict consumer would. Run after `pnpm build`.
+  // lib ES2019 is the package's target: types must not rely on newer libs.
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2019", "DOM"],
     "types": [],
     "strict": true,
     "noEmit": true,

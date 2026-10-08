@@ -1,0 +1,9 @@
+{
+  // The same consumer check with a modern lib and noImplicitOverride, where
+  // Error already declares `cause`.
+  "extends": "./tsconfig.consumer.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "noImplicitOverride": true
+  }
+}

@@ -62,8 +62,6 @@ Treat **all stored data as potentially compromised** and validate on read.
 
 ---
 
----
-
 ## Concepts
 
 - **One vault, one storage key.** `createVault({ key: 'CART' })` stores every
@@ -255,6 +253,12 @@ reports `StorageConflictError`. This keeps hot module reloading working, and
 makes accidental double use fail loudly instead of corrupting data.
 
 `'memory'` vaults each get their own store, so they never conflict.
+
+Detection works per driver **instance**: `'local'` and `'session'` always
+resolve to one shared driver each, so two vaults on the same key are caught.
+If you construct drivers yourself, reuse one instance per backend, because
+`new WebStorageDriver(localStorage)` is a different instance from `'local'`
+and a vault on each would not be detected.
 
 ---
 

@@ -16,3 +16,4 @@ vault.set('a', 1, { ttl: 1000 });
 export const driverName = (driver: StorageDriver): string => driver.name;
 export const isQuota = (error: unknown): boolean =>
   error instanceof StorageQuotaError;
+export const causeOf = (error: StorageQuotaError): unknown => error.cause;

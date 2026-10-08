@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { isExpired, remainingTtl, toJson } from '../../../src/core/entry.js';
+import {
+  expiryAfter,
+  isExpired,
+  remainingTtl,
+  toJson,
+} from '../../../src/core/entry.js';
 import type { Entry } from '../../../src/core/entry.js';
 import {
   StorageArgumentError,
@@ -15,9 +20,10 @@ describe('isExpired', () => {
     expect(isExpired(permanent, Number.MAX_SAFE_INTEGER)).toBe(false);
   });
 
-  it('is live before expiresAt and expired from expiresAt on', () => {
+  // Same boundary as 1.x: expired only once now is past expiresAt.
+  it('is live up to and including expiresAt, and expired after it', () => {
     expect(isExpired(expiring, 99)).toBe(false);
-    expect(isExpired(expiring, 100)).toBe(true);
+    expect(isExpired(expiring, 100)).toBe(false);
     expect(isExpired(expiring, 101)).toBe(true);
   });
 });
@@ -69,6 +75,21 @@ describe('toJson', () => {
     expect(caught).toBeInstanceOf(StorageSerializationError);
     expect((caught as StorageSerializationError).cause).toBeInstanceOf(
       TypeError
+    );
+  });
+});
+
+describe('expiryAfter', () => {
+  it('adds a duration to a timestamp', () => {
+    expect(expiryAfter(1000, 500)).toBe(1500);
+  });
+
+  it('rejects a result past the largest safe timestamp', () => {
+    expect(() => expiryAfter(1000, Number.MAX_SAFE_INTEGER)).toThrow(
+      StorageArgumentError
+    );
+    expect(() => expiryAfter(0, Number.MAX_VALUE)).toThrow(
+      StorageArgumentError
     );
   });
 });

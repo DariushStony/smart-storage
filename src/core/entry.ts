@@ -11,8 +11,20 @@ interface Entry {
   readonly expiresAt: number | null;
 }
 
+// Same boundary as 1.x: an entry is gone only once now is past expiresAt.
 function isExpired(entry: Entry, now: number): boolean {
-  return entry.expiresAt !== null && now >= entry.expiresAt;
+  return entry.expiresAt !== null && now > entry.expiresAt;
+}
+
+/** `from + ms`, rejecting results JSON and Date cannot hold exactly. */
+function expiryAfter(from: number, ms: number): number {
+  const expiresAt = from + ms;
+  if (expiresAt > Number.MAX_SAFE_INTEGER) {
+    throw new StorageArgumentError(
+      'That lifetime is too long: the expiry would pass the largest safe timestamp.'
+    );
+  }
+  return expiresAt;
 }
 
 function remainingTtl(entry: Entry, now: number): number {
@@ -45,5 +57,5 @@ function toJson(value: unknown): string {
   return json;
 }
 
-export { isExpired, remainingTtl, toJson };
+export { isExpired, expiryAfter, remainingTtl, toJson };
 export type { Entry };

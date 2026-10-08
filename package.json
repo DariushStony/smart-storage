@@ -57,7 +57,7 @@
     "analyze": "size-limit --why",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "typecheck:dist": "tsc -p tsconfig.consumer.json",
+    "typecheck:dist": "tsc -p tsconfig.consumer.json && tsc -p tsconfig.consumer-es2022.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
